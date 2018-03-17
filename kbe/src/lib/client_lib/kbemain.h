@@ -2,7 +2,7 @@
 This source file is part of KBEngine
 For the latest info, see http://www.kbengine.org/
 
-Copyright (c) 2008-2017 KBEngine.
+Copyright (c) 2008-2018 KBEngine.
 
 KBEngine is free software: you can redistribute it and/or modify
 it under the terms of the GNU Lesser General Public License as published by
@@ -32,6 +32,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "pyscript/py_gc.h"
 #include "resmgr/resmgr.h"
 #include "client_lib/config.h"
+#include "entitydef/entity_component.h"
 
 namespace KBEngine{
 
@@ -99,10 +100,18 @@ inline bool installPyScript(KBEngine::script::Script& script, COMPONENT_TYPE com
 	pyPaths += user_scripts_path + L"data;";
 	pyPaths += user_scripts_path + L"user_type;";
 
-	if(componentType == CLIENT_TYPE)
+	if (componentType == CLIENT_TYPE)
+	{
 		pyPaths += user_scripts_path + L"client;";
+		pyPaths += user_scripts_path + L"client/interfaces;";
+		pyPaths += user_scripts_path + L"client/components;";
+	}
 	else
+	{
 		pyPaths += user_scripts_path + L"bots;";
+		pyPaths += user_scripts_path + L"bots/interfaces;";
+		pyPaths += user_scripts_path + L"bots/components;";
+	}
 
 	std::string kbe_res_path = Resmgr::getSingleton().getPySysResPath();
 	kbe_res_path += "scripts/common";
@@ -113,6 +122,7 @@ inline bool installPyScript(KBEngine::script::Script& script, COMPONENT_TYPE com
 
 	EntityDef::installScript(script.getModule());
 	client::Entity::installScript(script.getModule());
+	EntityComponent::installScript(script.getModule());
 	Entities<client::Entity>::installScript(NULL);
 	EntityGarbages<client::Entity>::installScript(NULL);
 	return ret;
@@ -123,6 +133,7 @@ inline bool uninstallPyScript(KBEngine::script::Script& script)
 	// script::PyGC::set_debug(script::PyGC::DEBUG_STATS|script::PyGC::DEBUG_LEAK);
 	// script::PyGC::collect();
 	client::Entity::uninstallScript();
+	EntityComponent::uninstallScript();
 	Entities<client::Entity>::uninstallScript();
 	EntityGarbages<client::Entity>::uninstallScript();
 	EntityDef::uninstallScript();
@@ -137,8 +148,8 @@ inline bool loadConfig()
 	
 	if(g_componentType == BOTS_TYPE)
 	{
-		// "../../res/server/kbengine_defs.xml"
-		g_kbeSrvConfig.loadConfig("server/kbengine_defs.xml");
+		// "../../res/server/kbengine_defaults.xml"
+		g_kbeSrvConfig.loadConfig("server/kbengine_defaults.xml");
 
 		// "../../../assets/res/server/kbengine.xml"
 		g_kbeSrvConfig.loadConfig("server/kbengine.xml");

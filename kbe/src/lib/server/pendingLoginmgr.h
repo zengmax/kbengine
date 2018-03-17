@@ -2,7 +2,7 @@
 This source file is part of KBEngine
 For the latest info, see http://www.kbengine.org/
 
-Copyright (c) 2008-2017 KBEngine.
+Copyright (c) 2008-2018 KBEngine.
 
 KBEngine is free software: you can redistribute it and/or modify
 it under the terms of the GNU Lesser General Public License as published by
@@ -54,6 +54,7 @@ public:
 			entityID = 0;
 			lastProcessTime = 0;
 			forceInternalLogin = false;
+			needCheckPassword = true;
 		}
 
 		Network::Address addr;
@@ -67,6 +68,7 @@ public:
 		uint32 flags;
 		uint64 deadline;
 		bool forceInternalLogin;
+		bool needCheckPassword;
 	};
 
 	typedef KBEUnordered_map<std::string, PLInfos*> PTINFO_MAP;

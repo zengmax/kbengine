@@ -2,7 +2,7 @@
 This source file is part of KBEngine
 For the latest info, see http://www.kbengine.org/
 
-Copyright (c) 2008-2017 KBEngine.
+Copyright (c) 2008-2018 KBEngine.
 
 KBEngine is free software: you can redistribute it and/or modify
 it under the terms of the GNU Lesser General Public License as published by
@@ -169,7 +169,7 @@ void Dbmgr::onShutdownBegin()
 
 	// Í¨Öª½Å±¾
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
-	SCRIPT_OBJECT_CALL_ARGS0(getEntryScript().get(), const_cast<char*>("onDBMgrShutDown"));
+	SCRIPT_OBJECT_CALL_ARGS0(getEntryScript().get(), const_cast<char*>("onDBMgrShutDown"), false);
 }
 
 //-------------------------------------------------------------------------------------	
@@ -655,6 +655,7 @@ void Dbmgr::onLoginAccountCBBFromInterfaces(Network::Channel* pChannel, KBEngine
 void Dbmgr::queryAccount(Network::Channel* pChannel, 
 						 std::string& accountName, 
 						 std::string& password,
+						 bool needCheckPassword,
 						 COMPONENT_ID componentID,
 						 ENTITY_ID entityID,
 						 DBID entityDBID, 
@@ -677,7 +678,7 @@ void Dbmgr::queryAccount(Network::Channel* pChannel,
 		return;
 	}
 
-	pBuffered_DBTasks->addTask(new DBTaskQueryAccount(pChannel->addr(), accountName, password, 
+	pBuffered_DBTasks->addTask(new DBTaskQueryAccount(pChannel->addr(), accountName, password, needCheckPassword,
 		componentID, entityID, entityDBID, ip, port));
 
 	numQueryEntity_++;
@@ -822,7 +823,7 @@ void Dbmgr::entityAutoLoad(Network::Channel* pChannel, KBEngine::MemoryStream& s
 }
 
 //-------------------------------------------------------------------------------------
-void Dbmgr::deleteBaseByDBID(Network::Channel* pChannel, KBEngine::MemoryStream& s)
+void Dbmgr::deleteEntityByDBID(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
 	COMPONENT_ID componentID;
 	ENTITY_SCRIPT_UID sid;
@@ -834,11 +835,11 @@ void Dbmgr::deleteBaseByDBID(Network::Channel* pChannel, KBEngine::MemoryStream&
 	KBE_ASSERT(entityDBID > 0);
 
 	DBUtil::pThreadPool(g_kbeSrvConfig.dbInterfaceIndex2dbInterfaceName(dbInterfaceIndex))->
-		addTask(new DBTaskDeleteBaseByDBID(pChannel->addr(), componentID, entityDBID, callbackID, sid));
+		addTask(new DBTaskDeleteEntityByDBID(pChannel->addr(), componentID, entityDBID, callbackID, sid));
 }
 
 //-------------------------------------------------------------------------------------
-void Dbmgr::lookUpBaseByDBID(Network::Channel* pChannel, KBEngine::MemoryStream& s)
+void Dbmgr::lookUpEntityByDBID(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
 	COMPONENT_ID componentID;
 	ENTITY_SCRIPT_UID sid;
@@ -850,7 +851,7 @@ void Dbmgr::lookUpBaseByDBID(Network::Channel* pChannel, KBEngine::MemoryStream&
 	KBE_ASSERT(entityDBID > 0);
 
 	DBUtil::pThreadPool(g_kbeSrvConfig.dbInterfaceIndex2dbInterfaceName(dbInterfaceIndex))->
-		addTask(new DBTaskLookUpBaseByDBID(pChannel->addr(), componentID, entityDBID, callbackID, sid));
+		addTask(new DBTaskLookUpEntityByDBID(pChannel->addr(), componentID, entityDBID, callbackID, sid));
 }
 
 //-------------------------------------------------------------------------------------

@@ -1,8 +1,102 @@
+###v1.1.5
+
+	2018/2/26
+
+	新增与改善：
+		若干小调整。
+		继续完善SDK生成。
+		更新API文档。
+
+	BUG修正：
+		修正定义了服务器端python类型时sdk生成报错
+		修正moveToEntity功能pitch不改变问题(#557)
+
+
+
+###v1.1.3
+
+	2018/1/31
+
+	新增与改善：
+		将AOI概念调整为View概念以适合更普遍的游戏(#545)
+		调整mailbox概念, 改名为entityCall(#546)
+		Entityy.onEntititesEnabled改为onClientEnabled，onEntitites名称有歧义且不能描述实际作用(#548)
+		KBEngine.createInNewSpace改为createCellEntityInNewSpace(#548)
+		KBEngine.Base改名为KBEngine.Entity(#549)
+		支持GCC7.x以上版本编译(#552)
+		防止用户定义的属性名称与API冲突(#556)
+		更新API文档。
+
+
+
+###v1.1.2
+
+	2018/1/15
+
+	新增与改善：
+		客户端SDK生成器，完成Unity的生成(#532)
+		添加不同客户端引擎的SDK模板。
+		更新API文档。
+
+	BUG修正：
+		修正cluster_controller工具的logwatch外部回调给入出错。
+
+
+
+###v1.1.1
+
+	2018/1/2
+
+	新增与改善：
+		由于新版本mysql等要求密码长度，统一调整默认密码。
+		所有引擎配置都加上 **_defaults后缀， 允许不同项目重写所有配置 (#531)
+		实体增加了2个回调， onUpdateBegin和onUpdateEnd。 分别在帧开始和结束时调用， 可以在其中增加帧号(#538)
+		alias.xml改名types.xml。
+		更新API文档。
+
+	BUG修正：
+		防止在数据包debug时累积的包太多造成输出buffer过大。
+		当def中定义的python类型没有任何数据时，下次加载会出错(#540)
+
+
+
+###v1.1.0
+
+	2017/8/25
+
+	新增与改善：
+		增强外部对内方法访问的安全性。
+		调整API:entitiesInRange在实体销毁期间允许调用
+		项目在windows下升级到vs2015
+		实体def文件中Implements字段改为Interfaces，兼容多个版本(#526)
+		更新API文档。
+
+	BUG修正：
+		修复一处特殊处理时导致的内存泄漏
+		统一自定义的Dict get属性符合Python3.x标准
+		修正当客户端类def属性大于255时可能产生插件解析的一些错误问题(#516)
+
+
+
+###v1.0.0
+
+	2017/9/25
+
+	稳定版本!
+
+
+
 ###v0.9.19
 
 	2017/8/25
 
-	文档版本!
+	新增与改善：
+		将Python SSL默认集成到项目中。
+		更新API文档。
+
+	BUG修正：
+		解决热更新def后， 客户端无法动态导入最新的协议(#506)
+		当接入第三方登陆后，baseapp不应该再检查密码(#507)
 
 
 

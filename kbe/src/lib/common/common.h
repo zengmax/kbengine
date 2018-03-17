@@ -2,7 +2,7 @@
 This source file is part of KBEngine
 For the latest info, see http://www.kbengine.org/
 
-Copyright (c) 2008-2017 KBEngine.
+Copyright (c) 2008-2018 KBEngine.
 
 KBEngine is free software: you can redistribute it and/or modify
 it under the terms of the GNU Lesser General Public License as published by
@@ -68,20 +68,20 @@ enum ACCOUNT_FLAGS
 	ACCOUNT_FLAG_NOT_ACTIVATED = 0x000000002
 };
 
-/** entity的mailbox类别 */
-enum ENTITY_MAILBOX_TYPE
+/** entity的entityCall类别 */
+enum ENTITYCALL_TYPE
 {
-	MAILBOX_TYPE_CELL												= 0,
-	MAILBOX_TYPE_BASE												= 1,
-	MAILBOX_TYPE_CLIENT												= 2,
-	MAILBOX_TYPE_CELL_VIA_BASE										= 3,
-	MAILBOX_TYPE_BASE_VIA_CELL										= 4,
-	MAILBOX_TYPE_CLIENT_VIA_CELL									= 5,
-	MAILBOX_TYPE_CLIENT_VIA_BASE									= 6,
+	ENTITYCALL_TYPE_CELL												= 0,
+	ENTITYCALL_TYPE_BASE												= 1,
+	ENTITYCALL_TYPE_CLIENT												= 2,
+	ENTITYCALL_TYPE_CELL_VIA_BASE										= 3,
+	ENTITYCALL_TYPE_BASE_VIA_CELL										= 4,
+	ENTITYCALL_TYPE_CLIENT_VIA_CELL										= 5,
+	ENTITYCALL_TYPE_CLIENT_VIA_BASE										= 6,
 };
 
-/** mailbox的类别对换为字符串名称 严格和ENTITY_MAILBOX_TYPE索引匹配 */
-const char ENTITY_MAILBOX_TYPE_TO_NAME_TABLE[][8] = 
+/** entityCall的类别对换为字符串名称 严格和ENTITYCALL_TYPE索引匹配 */
+const char ENTITYCALL_TYPE_TO_NAME_TABLE[][8] = 
 {
 	"cell",
 	"base",
@@ -92,8 +92,8 @@ const char ENTITY_MAILBOX_TYPE_TO_NAME_TABLE[][8] =
 	"client",
 };
 
-/** mailbox的类别对换为字符串名称 严格和ENTITY_MAILBOX_TYPE索引匹配 */
-const char ENTITY_MAILBOX_TYPE_TO_NAME_TABLE_EX[][14] =
+/** entityCall的类别对换为字符串名称 严格和ENTITYCALL_TYPE索引匹配 */
+const char ENTITYCALL_TYPE_TO_NAME_TABLE_EX[][14] =
 {
 	"cell",
 	"base",
@@ -140,7 +140,8 @@ enum COMPONENT_TYPE
 	BOTS_TYPE				= 11,
 	WATCHER_TYPE			= 12,
 	INTERFACES_TYPE			= 13,
-	COMPONENT_END_TYPE		= 14,
+	TOOL_TYPE				= 14,
+	COMPONENT_END_TYPE		= 15,
 };
 
 /** 当前服务器组件类别和ID */
@@ -163,6 +164,7 @@ const char COMPONENT_NAME[][255] = {
 	"bots",
 	"watcher",
 	"interfaces",
+	"tool",
 };
 
 const char COMPONENT_NAME_1[][255] = {
@@ -180,6 +182,7 @@ const char COMPONENT_NAME_1[][255] = {
 	"bots      ",
 	"watcher   ",
 	"interfaces",
+	"tool      ",
 };
 
 const char COMPONENT_NAME_2[][255] = {
@@ -197,6 +200,7 @@ const char COMPONENT_NAME_2[][255] = {
 	"      bots",
 	"   watcher",
 	"interfaces",
+	"      tool",
 };
 
 inline const char* COMPONENT_NAME_EX(COMPONENT_TYPE CTYPE)
@@ -242,7 +246,7 @@ inline COMPONENT_TYPE ComponentName2ComponentType(const char* name)
 
 // 所有的组件列表
 const COMPONENT_TYPE ALL_COMPONENT_TYPES[] = {BASEAPPMGR_TYPE, CELLAPPMGR_TYPE, DBMGR_TYPE, CELLAPP_TYPE, 
-						BASEAPP_TYPE, LOGINAPP_TYPE, MACHINE_TYPE, CONSOLE_TYPE, LOGGER_TYPE, 
+						BASEAPP_TYPE, LOGINAPP_TYPE, MACHINE_TYPE, CONSOLE_TYPE, TOOL_TYPE, LOGGER_TYPE,
 						WATCHER_TYPE, INTERFACES_TYPE, BOTS_TYPE, UNKNOWN_COMPONENT_TYPE};
 
 // 所有的后端组件列表

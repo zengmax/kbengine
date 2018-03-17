@@ -2,7 +2,7 @@
 This source file is part of KBEngine
 For the latest info, see http://www.kbengine.org/
 
-Copyright (c) 2008-2017 KBEngine.
+Copyright (c) 2008-2018 KBEngine.
 
 KBEngine is free software: you can redistribute it and/or modify
 it under the terms of the GNU Lesser General Public License as published by
@@ -218,18 +218,18 @@ protected:
 /**
 	从数据库中删除entity
 */
-class DBTaskDeleteBaseByDBID : public DBTask
+class DBTaskDeleteEntityByDBID : public DBTask
 {
 public:
-	DBTaskDeleteBaseByDBID(const Network::Address& addr, COMPONENT_ID componentID, 
+	DBTaskDeleteEntityByDBID(const Network::Address& addr, COMPONENT_ID componentID, 
 		DBID entityDBID, CALLBACK_ID callbackID, ENTITY_SCRIPT_UID sid);
 
-	virtual ~DBTaskDeleteBaseByDBID();
+	virtual ~DBTaskDeleteEntityByDBID();
 	virtual bool db_thread_process();
 	virtual thread::TPTask::TPTaskState presentMainThread();
 
 	virtual std::string name() const {
-		return "DBTaskDeleteBaseByDBID";
+		return "DBTaskDeleteEntityByDBID";
 	}
 
 protected:
@@ -270,18 +270,18 @@ protected:
 /**
 	通过dbid查询一个实体是否从数据库检出
 */
-class DBTaskLookUpBaseByDBID : public DBTask
+class DBTaskLookUpEntityByDBID : public DBTask
 {
 public:
-	DBTaskLookUpBaseByDBID(const Network::Address& addr, COMPONENT_ID componentID, 
+	DBTaskLookUpEntityByDBID(const Network::Address& addr, COMPONENT_ID componentID, 
 		DBID entityDBID, CALLBACK_ID callbackID, ENTITY_SCRIPT_UID sid);
 
-	virtual ~DBTaskLookUpBaseByDBID();
+	virtual ~DBTaskLookUpEntityByDBID();
 	virtual bool db_thread_process();
 	virtual thread::TPTask::TPTaskState presentMainThread();
 
 	virtual std::string name() const {
-		return "DBTaskLookUpBaseByDBID";
+		return "DBTaskLookUpEntityByDBID";
 	}
 
 protected:
@@ -493,7 +493,7 @@ protected:
 class DBTaskQueryAccount : public EntityDBTask
 {
 public:
-	DBTaskQueryAccount(const Network::Address& addr, std::string& accountName, std::string& password, 
+	DBTaskQueryAccount(const Network::Address& addr, std::string& accountName, std::string& password, bool needCheckPassword,
 		COMPONENT_ID componentID, ENTITY_ID entityID, DBID entityDBID, uint32 ip, uint16 port);
 	virtual ~DBTaskQueryAccount();
 	virtual bool db_thread_process();
@@ -519,6 +519,7 @@ protected:
 	uint64 deadline_;
 
 	std::string bindatas_;
+	bool needCheckPassword_;
 };
 
 /**

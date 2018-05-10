@@ -1,22 +1,4 @@
-/*
-This source file is part of KBEngine
-For the latest info, see http://www.kbengine.org/
-
-Copyright (c) 2008-2018 KBEngine.
-
-KBEngine is free software: you can redistribute it and/or modify
-it under the terms of the GNU Lesser General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-KBEngine is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Lesser General Public License for more details.
- 
-You should have received a copy of the GNU Lesser General Public License
-along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
-*/
+// Copyright 2008-2018 Yolo Technologies, Inc. All Rights Reserved. https://www.comblockengine.com
 
 
 #include "entity_component.h"
@@ -715,16 +697,19 @@ bool EntityComponent::isSamePersistentType(PyObject* pyValue)
 
 		if (g_componentType == BASEAPP_TYPE)
 		{
-			PyObject* cellDataDict = PyObject_GetAttrString(owner(), "cellData");
-			if (!cellDataDict)
+			if (pPropertyDescription_->hasCell())
 			{
-				PyErr_Clear();
-			}
-			else
-			{
-				cellComponentPart = PyDict_GetItemString(cellDataDict, pPropertyDescription_->getName());
-				Py_DECREF(cellDataDict);
-				Py_INCREF(cellComponentPart);
+				PyObject* cellDataDict = PyObject_GetAttrString(owner(), "cellData");
+				if (!cellDataDict)
+				{
+					PyErr_Clear();
+				}
+				else
+				{
+					cellComponentPart = PyDict_GetItemString(cellDataDict, pPropertyDescription_->getName());
+					Py_DECREF(cellDataDict);
+					Py_INCREF(cellComponentPart);
+				}
 			}
 
 			if (componentType_ == BASEAPP_TYPE)
@@ -875,16 +860,19 @@ void EntityComponent::addPersistentToStream(MemoryStream* mstream, PyObject* pyV
 
 		if (g_componentType == BASEAPP_TYPE)
 		{
-			PyObject* cellDataDict = PyObject_GetAttrString(owner(), "cellData");
-			if (!cellDataDict)
+			if (pPropertyDescription_->hasCell())
 			{
-				PyErr_Clear();
-			}
-			else
-			{
-				cellComponentPart = PyDict_GetItemString(cellDataDict, pPropertyDescription_->getName());
-				Py_DECREF(cellDataDict);
-				Py_INCREF(cellComponentPart);
+				PyObject* cellDataDict = PyObject_GetAttrString(owner(), "cellData");
+				if (!cellDataDict)
+				{
+					PyErr_Clear();
+				}
+				else
+				{
+					cellComponentPart = PyDict_GetItemString(cellDataDict, pPropertyDescription_->getName());
+					Py_DECREF(cellDataDict);
+					Py_INCREF(cellComponentPart);
+				}
 			}
 
 			if (componentType_ == BASEAPP_TYPE)
@@ -1364,28 +1352,37 @@ void EntityComponent::convertDictDataToEntityComponent(ENTITY_ID entityID, Scrip
 	for (; comps_iter != componentDescrs.end(); ++comps_iter)
 	{
 		PyObject* pyObj = PyDict_GetItemString(cellData, comps_iter->first.c_str());
-		if (pyObj && PyDict_Check(pyObj))
+		if (!pyObj || !PyDict_Check(pyObj))
 		{
-			KBE_ASSERT(EntityDef::context().currEntityID > 0);
+			// 由于存在一种情况， 组件def中没有内容， 但有cell脚本，此时baseapp上无法判断他是否有cell属性，所以写celldata时没有数据写入
+			if (g_componentType == BASEAPP_TYPE)
+			{
+				SCRIPT_ERROR_CHECK();
+				continue;
+			}
+			else
+			{
+				PyErr_Clear();
+			}
+		}
 
-			PyObject* pyobj = comps_iter->second->createObject();
+		KBE_ASSERT(EntityDef::context().currEntityID > 0);
 
-			// 执行Entity的构造函数
-			PyObject* pyEntityComponent = new(pyobj) EntityComponent(entityID, comps_iter->second, g_componentType);
+		PyObject* pyobj = comps_iter->second->createObject();
 
-			EntityComponent* pEntityComponent = static_cast<EntityComponent*>(pyEntityComponent);
+		// 执行Entity的构造函数
+		PyObject* pyEntityComponent = new(pyobj) EntityComponent(entityID, comps_iter->second, g_componentType);
+
+		EntityComponent* pEntityComponent = static_cast<EntityComponent*>(pyEntityComponent);
+
+		if(pyObj)
 			pEntityComponent->createFromDict(pyObj);
 
-			PropertyDescription* pPropertyDescription = pEntityScriptDescrs->findCellPropertyDescription(comps_iter->first.c_str());
-			KBE_ASSERT(pPropertyDescription);
-			pEntityComponent->pPropertyDescription(pPropertyDescription);
-			PyDict_SetItemString(cellData, comps_iter->first.c_str(), pEntityComponent);
-			Py_DECREF(pEntityComponent);
-		}
-		else
-		{
-			SCRIPT_ERROR_CHECK();
-		}
+		PropertyDescription* pPropertyDescription = pEntityScriptDescrs->findCellPropertyDescription(comps_iter->first.c_str());
+		KBE_ASSERT(pPropertyDescription);
+		pEntityComponent->pPropertyDescription(pPropertyDescription);
+		PyDict_SetItemString(cellData, comps_iter->first.c_str(), pEntityComponent);
+		Py_DECREF(pEntityComponent);
 	}
 }
 

@@ -36,6 +36,26 @@
 		    public Int32 iv;
 		}
 
+		
+		public byte[] setBuffer(byte[] buffer)
+		{
+			byte[] outBuf = datas_;
+			datas_ = buffer;
+			return outBuf;
+		}
+
+		public void swap(MemoryStream stream)
+		{
+			int t_rpos = rpos;
+			int t_wpos = wpos;
+			rpos = stream.rpos;
+			wpos = stream.wpos;
+			stream.rpos = t_rpos;
+			stream.wpos = t_wpos;
+
+			datas_ = stream.setBuffer(datas_);
+		}
+
 		/// <summary>
 		/// 把自己放回缓冲池
 		/// </summary>
@@ -139,6 +159,15 @@
 			return buf;
 		}
 	
+		public byte[] readEntitycall()
+		{
+			readUint64();
+			readInt32();
+			readUint16();
+			readUint16();
+			return new byte[0];
+		}
+
 		public Vector2 readVector2()
 		{
 			return new Vector2(readFloat(), readFloat());
@@ -331,6 +360,19 @@
 			writeFloat(v.y);
 			writeFloat(v.z);
 			writeFloat(v.w);
+		}
+
+		public void writeEntitycall(byte[] v)
+		{
+			UInt64 cid = 0;
+			Int32 id = 0;
+			UInt16 type = 0;
+			UInt16 utype = 0;
+
+			writeUint64(cid);
+			writeInt32(id);
+			writeUint16(type);
+			writeUint16(utype);
 		}
 
 		//---------------------------------------------------------------------------------

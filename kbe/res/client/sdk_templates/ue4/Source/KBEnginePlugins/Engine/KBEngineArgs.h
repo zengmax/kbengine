@@ -14,8 +14,11 @@ public:
 	KBEngineArgs();
 	virtual ~KBEngineArgs();
 
-	int getRecvBufferSize();
-	int getSendBufferSize();
+	int getTCPRecvBufferSize();
+	int getTCPSendBufferSize();
+
+	int getUDPRecvBufferSize();
+	int getUDPSendBufferSize();
 
 public:
 	FString ip;
@@ -25,16 +28,21 @@ public:
 	// Reference: http://www.kbengine.org/docs/programming/clientsdkprogramming.html, client types
 	EKCLIENT_TYPE clientType;
 
-	bool syncPlayer;
+	int syncPlayerMS;
 	bool useAliasEntityID;
 	bool isOnInitCallPropertysSetMethods;
+
+	// 强制禁用UDP通讯
+	bool forceDisableUDP;
 
 	// 心跳频率（tick数）
 	int serverHeartbeatTick;
 
 	// 发送缓冲大小
-	MessageLengthEx SEND_BUFFER_MAX;
+	MessageLengthEx TCP_SEND_BUFFER_MAX;
+	MessageLengthEx UDP_SEND_BUFFER_MAX;
 
 	// 接收缓冲区大小
-	MessageLengthEx RECV_BUFFER_MAX;
+	MessageLengthEx TCP_RECV_BUFFER_MAX;
+	MessageLengthEx UDP_RECV_BUFFER_MAX;
 };

@@ -50,9 +50,10 @@ entityID_(0),
 spaceID_(0),
 dbid_(0),
 ip_(),
-port_(),
+tcp_port_(0),
+udp_port_(0),
 baseappIP_(),
-baseappPort_(),
+baseappPort_(0),
 lastSentActiveTickTime_(timestamp()),
 lastSentUpdateDataTime_(timestamp()),
 connectedBaseapp_(false),
@@ -80,7 +81,7 @@ controlledEntities_()
 {
 	appID_ = g_appID++;
 
-	pServerChannel_ = Network::Channel::createPoolObject();
+	pServerChannel_ = Network::Channel::createPoolObject(OBJECTPOOL_POINT);
 	pServerChannel_->pNetworkInterface(&ninterface);
 }
 
@@ -124,7 +125,8 @@ void ClientObjectBase::reset(void)
 	dbid_ = 0;
 
 	ip_ = "";
-	port_ = 0;
+	tcp_port_ = 0;
+	udp_port_ = 0;
 
 	lastSentActiveTickTime_ = timestamp();
 	lastSentUpdateDataTime_ = timestamp();
@@ -146,7 +148,7 @@ void ClientObjectBase::reset(void)
 		pServerChannel_ = NULL;
 	}
 
-	pServerChannel_ = Network::Channel::createPoolObject();
+	pServerChannel_ = Network::Channel::createPoolObject(OBJECTPOOL_POINT);
 	pServerChannel_->pNetworkInterface(&networkInterface_);
 }
 
@@ -185,7 +187,7 @@ void ClientObjectBase::tickSend()
 	{
 		lastSentActiveTickTime_ = timestamp();
 
-		Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		if(connectedBaseapp_)
 			(*pBundle).newMessage(BaseappInterface::onClientActiveTick);
 		else
@@ -446,7 +448,7 @@ bool ClientObjectBase::deregisterEventHandle(EventHandle* pEventHandle)
 bool ClientObjectBase::createAccount()
 {
 	// 创建账号
-	Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	(*pBundle).newMessage(LoginappInterface::reqCreateAccount);
 	(*pBundle) << name_;
 	(*pBundle) << password_;
@@ -458,7 +460,7 @@ bool ClientObjectBase::createAccount()
 //-------------------------------------------------------------------------------------
 Network::Channel* ClientObjectBase::initLoginappChannel(std::string accountName, std::string passwd, std::string ip, KBEngine::uint32 port)
 {
-	Network::EndPoint* pEndpoint = Network::EndPoint::createPoolObject();
+	Network::EndPoint* pEndpoint = Network::EndPoint::createPoolObject(OBJECTPOOL_POINT);
 	
 	pEndpoint->socket(SOCK_STREAM);
 	if (!pEndpoint->good())
@@ -495,7 +497,7 @@ Network::Channel* ClientObjectBase::initLoginappChannel(std::string accountName,
 //-------------------------------------------------------------------------------------
 Network::Channel* ClientObjectBase::initBaseappChannel()
 {
-	Network::EndPoint* pEndpoint = Network::EndPoint::createPoolObject();
+	Network::EndPoint* pEndpoint = Network::EndPoint::createPoolObject(OBJECTPOOL_POINT);
 	
 	pEndpoint->socket(SOCK_STREAM);
 	if (!pEndpoint->good())
@@ -508,7 +510,7 @@ Network::Channel* ClientObjectBase::initBaseappChannel()
 	u_int32_t address;
 
 	Network::Address::string2ip(ip_.c_str(), address);
-	if(pEndpoint->connect(htons(port_), address) == -1)
+	if(pEndpoint->connect(htons(tcp_port_), address) == -1)
 	{
 		ERROR_MSG(fmt::format("ClientObjectBase::initBaseappChannel: connect server is error({})!\n",
 			kbe_strerror()));
@@ -517,7 +519,7 @@ Network::Channel* ClientObjectBase::initBaseappChannel()
 		return NULL;
 	}
 
-	Network::Address addr(ip_.c_str(), port_);
+	Network::Address addr(ip_.c_str(), tcp_port_);
 	pEndpoint->addr(addr);
 
 	pServerChannel_->pEndPoint(pEndpoint);
@@ -600,7 +602,7 @@ void ClientObjectBase::onScriptVersionNotMatch(Network::Channel* pChannel, Memor
 //-------------------------------------------------------------------------------------
 bool ClientObjectBase::login()
 {
-	Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 
 	// 提交账号密码请求登录
 	(*pBundle).newMessage(LoginappInterface::login);
@@ -640,7 +642,7 @@ bool ClientObjectBase::loginBaseapp()
 	// 请求登录网关, 能走到这里来一定是连接了网关
 	connectedBaseapp_ = true;
 
-	Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	(*pBundle).newMessage(BaseappInterface::loginBaseapp);
 	(*pBundle) << name_;
 	(*pBundle) << password_;
@@ -654,7 +656,7 @@ bool ClientObjectBase::reloginBaseapp()
 	// 请求重登陆网关, 通常是掉线了之后执行
 	connectedBaseapp_ = true;
 
-	Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	(*pBundle).newMessage(BaseappInterface::reloginBaseapp);
 	(*pBundle) << name_;
 	(*pBundle) << password_;
@@ -690,17 +692,18 @@ void ClientObjectBase::onLoginSuccessfully(Network::Channel * pChannel, MemorySt
 
 	s >> accountName;
 	s >> ip_;
-	s >> port_;
+	s >> tcp_port_;
+	s >> udp_port_;
 	s.readBlob(serverDatas_);
 	
 	connectedBaseapp_ = false;
-	INFO_MSG(fmt::format("ClientObjectBase::onLoginSuccessfully: {} addr={}:{}!\n", name_, ip_, port_));
+	INFO_MSG(fmt::format("ClientObjectBase::onLoginSuccessfully: {} addr={}:{}|{}!\n", name_, ip_, tcp_port_, udp_port_));
 
 	EventData_LoginSuccess eventdata;
 	eventHandler_.fire(&eventdata);
 
 	baseappIP_ = ip_;
-	baseappPort_ = port_;
+	baseappPort_ = tcp_port_;
 }
 
 //-------------------------------------------------------------------------------------	
@@ -1199,7 +1202,7 @@ void ClientObjectBase::updatePlayerToServer()
 
     if(posChanged || dirChanged)
     {
-        Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+        Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
         (*pBundle).newMessage(BaseappInterface::onUpdateDataFromClient);
 
         pEntity->position(clientPos);
@@ -1237,7 +1240,7 @@ void ClientObjectBase::updatePlayerToServer()
             entity->position(tempClientPos);
             entity->direction(tempClientDir);
 
-            Network::Bundle *tempBundle = Network::Bundle::createPoolObject();
+            Network::Bundle *tempBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
             (*tempBundle).newMessage(BaseappInterface::onUpdateDataFromClientForControlledEntity);
 
             (*tempBundle) << entity->id();
@@ -2132,7 +2135,7 @@ PyObject* ClientObjectBase::__py_getWatcher(PyObject* self, PyObject* args)
 
 	WATCHER_VALUE_TYPE wtype = pWobj->getType();
 	PyObject* pyval = NULL;
-	MemoryStream* stream = MemoryStream::createPoolObject();
+	MemoryStream* stream = MemoryStream::createPoolObject(OBJECTPOOL_POINT);
 	pWobj->addToStream(stream);
 	WATCHER_ID id;
 	(*stream) >> id;

@@ -19,7 +19,7 @@ HTTPCBHandler::HTTPCBHandler():
 pEndPoint_(NULL),
 clients_()
 {
-	pEndPoint_ = Network::EndPoint::createPoolObject();
+	pEndPoint_ = Network::EndPoint::createPoolObject(OBJECTPOOL_POINT);
 
 	pEndPoint_->socket(SOCK_STREAM);
 
@@ -30,10 +30,10 @@ clients_()
 	}
 
 	if (pEndPoint_->bind(htons(g_kbeSrvConfig.getLoginApp().http_cbport), 
-		Loginapp::getSingleton().networkInterface().extaddr().ip) == -1)
+		Loginapp::getSingleton().networkInterface().extTcpAddr().ip) == -1)
 	{
 		ERROR_MSG(fmt::format("HTTPCBHandler::bind({}): {}:{}\n",
-			 kbe_strerror(), inet_ntoa((struct in_addr&)Loginapp::getSingleton().networkInterface().extaddr().ip),
+			 kbe_strerror(), inet_ntoa((struct in_addr&)Loginapp::getSingleton().networkInterface().extTcpAddr().ip),
 			g_kbeSrvConfig.getLoginApp().http_cbport));
 
 		pEndPoint_->close();
@@ -43,7 +43,7 @@ clients_()
 	if(pEndPoint_->listen() == -1)
 	{
 		ERROR_MSG(fmt::format("HTTPCBHandler::listeningSocket({}): {}:{}\n",
-			 kbe_strerror(), inet_ntoa((struct in_addr&)Loginapp::getSingleton().networkInterface().extaddr().ip),
+			 kbe_strerror(), inet_ntoa((struct in_addr&)Loginapp::getSingleton().networkInterface().extTcpAddr().ip),
 			g_kbeSrvConfig.getLoginApp().http_cbport));
 
 		pEndPoint_->close();
@@ -55,7 +55,7 @@ clients_()
 	Loginapp::getSingleton().networkInterface().dispatcher().registerReadFileDescriptor(*pEndPoint_, this);
 
 	INFO_MSG(fmt::format("HTTPCBHandler::bind: {}:{}\n",
-		inet_ntoa((struct in_addr&)Loginapp::getSingleton().networkInterface().extaddr().ip),
+		inet_ntoa((struct in_addr&)Loginapp::getSingleton().networkInterface().extTcpAddr().ip),
 		g_kbeSrvConfig.getLoginApp().http_cbport));
 }
 
@@ -219,7 +219,7 @@ int HTTPCBHandler::handleInputNotification(int fd)
 			if(type == 1)
 			{
 				// œÚdbmgrº§ªÓ’À∫≈
-				Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+				Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 				(*pBundle).newMessage(DbmgrInterface::accountActivate);
 				(*pBundle) << code;
 				dbmgrinfos->pChannel->send(pBundle);
@@ -266,7 +266,7 @@ int HTTPCBHandler::handleInputNotification(int fd)
 					password = HttpUtility::URLDecode(password);
 
 					// œÚdbmgr÷ÿ÷√’À∫≈
-					Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+					Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 					(*pBundle).newMessage(DbmgrInterface::accountResetPassword);
 					(*pBundle) << KBEngine::strutil::kbe_trim(username);
 					(*pBundle) << KBEngine::strutil::kbe_trim(password);
@@ -297,7 +297,7 @@ int HTTPCBHandler::handleInputNotification(int fd)
 					username = HttpUtility::URLDecode(username);
 
 					// œÚdbmgr∞Û∂®’À∫≈’À∫≈
-					Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+					Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 					(*pBundle).newMessage(DbmgrInterface::accountBindMail);
 					(*pBundle) << KBEngine::strutil::kbe_trim(username);
 					(*pBundle) << code;
@@ -310,7 +310,7 @@ int HTTPCBHandler::handleInputNotification(int fd)
 			if(hellomessage.size() > 0 && client.state < 2)
 			{
 				KBEngine::strutil::kbe_replace(hellomessage, "${backlink}", fmt::format("http://{}:{}/{}{}", 
-					Loginapp::getSingleton().networkInterface().extaddr().ipAsString(),
+					Loginapp::getSingleton().networkInterface().extTcpAddr().ipAsString(),
 					g_kbeSrvConfig.getLoginApp().http_cbport,
 					keys,
 					code));

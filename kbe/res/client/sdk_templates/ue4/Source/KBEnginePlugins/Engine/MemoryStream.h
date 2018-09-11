@@ -75,6 +75,7 @@ public:
 
 public:
 	const static size_t DEFAULT_SIZE = 0x100;
+	const static size_t MAX_SIZE = 10000000;
 
 	MemoryStream() :
 		rpos_(0), 
@@ -122,13 +123,13 @@ public:
 
 	void data_resize(uint32 newsize)
 	{
-		KBE_ASSERT(newsize <= 1310700);
+		KBE_ASSERT(newsize <= MAX_SIZE);
 		data_.SetNumUninitialized(newsize);
 	}
 
 	void resize(uint32 newsize)
 	{
-		KBE_ASSERT(newsize <= 1310700);
+		KBE_ASSERT(newsize <= MAX_SIZE);
 		data_.SetNumUninitialized(newsize);
 		rpos_ = 0;
 		wpos_ = size();
@@ -136,7 +137,7 @@ public:
 
 	void reserve(uint32 ressize)
 	{
-		KBE_ASSERT(ressize <= 1310700);
+		KBE_ASSERT(ressize <= MAX_SIZE);
 
 		if (ressize > size())
 			data_.Reserve(ressize);
@@ -493,6 +494,28 @@ public:
 		return str;
 	}
 
+	TArray<uint8> readEntitycall()
+	{
+		TArray<uint8> datas;
+		uint64 cid = readUint64();
+		int32 id = readInt32();
+		uint16 type = readUint16();
+		uint16 utype = readUint16();
+		return datas;
+	}
+
+	uint32 readEntitycall(TArray<uint8>& datas)
+	{
+		if (length() <= 0)
+			return 0;
+
+		uint64 cid = readUint64();
+		int32 id = readInt32();
+		uint16 type = readUint16();
+		uint16 utype = readUint16();
+		return 0;
+	}
+
 	FVector2D readVector2()
 	{
 		return FVector2D(readFloat(), readFloat());
@@ -799,6 +822,16 @@ public:
 		}
 
 		(*this) << v;
+	}
+
+	void writeEntitycall(const TArray<uint8>& v)
+	{
+		uint64 cid = 0;
+		int32 id = 0;
+		uint16 type = 0;
+		uint16 utype = 0;
+
+		(*this) << cid << id << type << utype;
 	}
 
 	void writeVector2(const FVector2D& v)

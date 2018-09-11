@@ -7,6 +7,7 @@
 #include "Bundle.h"
 #include "Engine.h"
 #include "KBDebug.h"
+#include "Entity.h"
 
 // Sets default values for this component's properties
 UKBEMain::UKBEMain(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
@@ -20,13 +21,16 @@ UKBEMain::UKBEMain(const FObjectInitializer& ObjectInitializer) : Super(ObjectIn
 
 	ip = TEXT("127.0.0.1");
 	port = @{KBE_LOGIN_PORT};
-	syncPlayer = true;
+	syncPlayerMS = 1000 / @{KBE_UPDATEHZ};
 	useAliasEntityID = @{KBE_USE_ALIAS_ENTITYID};
 	isOnInitCallPropertysSetMethods = true;
+	forceDisableUDP = false;
 	clientType = EKCLIENT_TYPE::CLIENT_TYPE_WIN;
-	serverHeartbeatTick = 15;
-	SEND_BUFFER_MAX = TCP_PACKET_MAX;
-	RECV_BUFFER_MAX = TCP_PACKET_MAX;
+	serverHeartbeatTick = @{KBE_SERVER_EXTERNAL_TIMEOUT};
+	TCP_SEND_BUFFER_MAX = TCP_PACKET_MAX;
+	TCP_RECV_BUFFER_MAX = TCP_PACKET_MAX;
+	UDP_SEND_BUFFER_MAX = 128;
+	UDP_RECV_BUFFER_MAX = 128;
 }
 
 void UKBEMain::InitializeComponent()
@@ -47,13 +51,16 @@ void UKBEMain::BeginPlay()
 	KBEngineArgs* pArgs = new KBEngineArgs();
 	pArgs->ip = ip;
 	pArgs->port = port;
-	pArgs->syncPlayer = syncPlayer;
+	pArgs->syncPlayerMS = syncPlayerMS;
 	pArgs->useAliasEntityID = useAliasEntityID;
 	pArgs->isOnInitCallPropertysSetMethods = isOnInitCallPropertysSetMethods;
+	pArgs->forceDisableUDP = forceDisableUDP;
 	pArgs->clientType = clientType;
-	pArgs->serverHeartbeatTick = serverHeartbeatTick;
-	pArgs->SEND_BUFFER_MAX = SEND_BUFFER_MAX;
-	pArgs->RECV_BUFFER_MAX = RECV_BUFFER_MAX;
+	pArgs->serverHeartbeatTick = serverHeartbeatTick / 2;
+	pArgs->TCP_SEND_BUFFER_MAX = TCP_SEND_BUFFER_MAX;
+	pArgs->TCP_RECV_BUFFER_MAX = TCP_RECV_BUFFER_MAX;
+	pArgs->UDP_SEND_BUFFER_MAX = UDP_SEND_BUFFER_MAX;
+	pArgs->UDP_RECV_BUFFER_MAX = UDP_RECV_BUFFER_MAX;
 
 	if (!KBEngineApp::getSingleton().initialize(pArgs))
 		delete pArgs;

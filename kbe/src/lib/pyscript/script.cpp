@@ -175,6 +175,7 @@ bool Script::install(const wchar_t* pythonHomeDir, std::wstring pyPaths,
         return false;
     } 
 
+	PySys_SetArgvEx(0, NULL, 0);
 	PyObject *m = PyImport_AddModule("__main__");
 
 	// 添加一个脚本基础模块
@@ -289,11 +290,6 @@ bool Script::installExtraModule(const char* moduleName)
 	// 添加一个脚本扩展模块
 	extraModule_ = PyImport_AddModule(moduleName);
 	if (extraModule_ == NULL)
-		return false;
-	
-	// 初始化扩展模块
-	PyObject *module = PyImport_AddModule(moduleName);
-	if (module == NULL)
 		return false;
 
 	// 将扩展模块对象加入main

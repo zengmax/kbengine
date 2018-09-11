@@ -212,7 +212,7 @@ void Entity::onDestroy(bool callScript)
 			setDirty();
 			this->backupCellData();
 
-			Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+			Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 			(*pBundle).newMessage(BaseappInterface::onLoseCell);
 			(*pBundle) << id_;
 			baseEntityCall_->sendCall(pBundle);
@@ -552,8 +552,8 @@ void Entity::sendControlledByStatusMessage(EntityCall* baseEntityCall, int8 isCo
 	if (!pChannel)
 		return;
 
-	Network::Bundle* pSendBundle = Network::Bundle::ObjPool().createObject();
-	Network::Bundle* pForwardBundle = Network::Bundle::ObjPool().createObject();
+	Network::Bundle* pSendBundle = Network::Bundle::ObjPool().createObject(OBJECTPOOL_POINT);
+	Network::Bundle* pForwardBundle = Network::Bundle::ObjPool().createObject(OBJECTPOOL_POINT);
 
 	(*pForwardBundle).newMessage(ClientInterface::onControlEntity);
 	(*pForwardBundle) << id();
@@ -646,7 +646,7 @@ PyObject* Entity::onScriptGetAttribute(PyObject* attr)
 		if(pMethodDescription)
 		{
 			free(ccattr);
-			return new RealEntityMethod(pMethodDescription, this);
+			return new RealEntityMethod(NULL, pMethodDescription, this);
 		}
 	}
 	else
@@ -686,7 +686,7 @@ void Entity::onDefDataChanged(EntityComponent* pEntityComponent, const PropertyD
 	uint32 flags = propertyDescription->getFlags();
 
 	// 首先创建一个需要广播的模板流
-	MemoryStream* mstream = MemoryStream::createPoolObject();
+	MemoryStream* mstream = MemoryStream::createPoolObject(OBJECTPOOL_POINT);
 
 	EntityDef::context().currComponentType = g_componentType;
 	propertyDescription->getDataType()->addToStream(mstream, pyData);
@@ -852,7 +852,7 @@ void Entity::onDefDataChanged(EntityComponent* pEntityComponent, const PropertyD
 		
 		Network::Channel* pChannel = pWitness_->pChannel();
 		if(!pChannel)
-			pSendBundle = Network::Bundle::createPoolObject();
+			pSendBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		else
 			pSendBundle = pChannel->createSendBundle();
 		
@@ -1096,18 +1096,18 @@ void Entity::addCellDataToStream(COMPONENT_TYPE sendTo, uint32 flags, MemoryStre
 				(*mstream) << propertyDescription->getUType();
 			}
 
-			if (!propertyDescription->getDataType()->isSameType(pyVal))
+			if (!propertyDescription->isSameType(pyVal))
 			{
 				ERROR_MSG(fmt::format("{}::addCellDataToStream: {}({}) not is ({})!\n", this->scriptName(),
 					propertyDescription->getName(), (pyVal ? pyVal->ob_type->tp_name : "unknown"), propertyDescription->getDataType()->getName()));
 
-				PyObject* pydefval = propertyDescription->getDataType()->parseDefaultStr("");
-				propertyDescription->getDataType()->addToStream(mstream, pydefval);
+				PyObject* pydefval = propertyDescription->parseDefaultStr("");
+				propertyDescription->addToStream(mstream, pydefval);
 				Py_DECREF(pydefval);
 			}
 			else
 			{
-				propertyDescription->getDataType()->addToStream(mstream, pyVal);
+				propertyDescription->addToStream(mstream, pyVal);
 			}
 
 			if (PyErr_Occurred())
@@ -1131,15 +1131,29 @@ void Entity::backupCellData()
 	if(baseEntityCall_ != NULL)
 	{
 		// 将当前的cell部分数据打包 一起发送给base部分备份
-		Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		(*pBundle).newMessage(BaseappInterface::onBackupEntityCellData);
 		(*pBundle) << id_;
 		(*pBundle) << isDirty();
 		
 		if(isDirty())
 		{
-			MemoryStream* s = MemoryStream::createPoolObject();
-			addCellDataToStream(BASEAPP_TYPE, ENTITY_CELL_DATA_FLAGS, s);
+			MemoryStream* s = MemoryStream::createPoolObject(OBJECTPOOL_POINT);
+
+			try
+			{
+				addCellDataToStream(BASEAPP_TYPE, ENTITY_CELL_DATA_FLAGS, s);
+			}
+			catch (MemoryStreamWriteOverflow & err)
+			{
+				ERROR_MSG(fmt::format("{}::backupCellData({}): {}\n",
+					scriptName(), id(), err.what()));
+
+				MemoryStream::reclaimPoolObject(s);
+				Network::Bundle::reclaimPoolObject(pBundle);
+				return;
+			}
+
 			(*pBundle).append(s);
 			MemoryStream::reclaimPoolObject(s);
 		}
@@ -1203,7 +1217,7 @@ void Entity::writeToDB(void* data, void* extra1, void* extra2)
 	onWriteToDB();
 	backupCellData();
 
-	Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	(*pBundle).newMessage(BaseappInterface::onCellWriteToDBCompleted);
 	(*pBundle) << this->id();
 	(*pBundle) << callbackID;
@@ -1771,6 +1785,8 @@ int Entity::pySetPosition(PyObject *value)
 	script::ScriptVector3::convertPyObjectToVector3(pos, value);
 	position(pos);
 
+	isOnGround_ = false;
+
 	static ENTITY_PROPERTY_UID posuid = 0;
 	if(posuid == 0)
 	{
@@ -1941,6 +1957,8 @@ void Entity::onPyPositionChanged()
 	if(this->isDestroyed())
 		return;
 
+	isOnGround_ = false;
+
 	static ENTITY_PROPERTY_UID posuid = 0;
 	if(posuid == 0)
 	{
@@ -2059,7 +2077,7 @@ void Entity::onGetWitness(bool fromBase)
 
 		if(pWitness_ == NULL)
 		{
-			setWitness(Witness::createPoolObject());
+			setWitness(Witness::createPoolObject(OBJECTPOOL_POINT));
 		}
 		else
 		{
@@ -2097,11 +2115,11 @@ void Entity::onGetWitness(bool fromBase)
 	// 如果一个实体已经有cell的情况下giveToClient，那么需要将最新的客户端属性值更新到客户端
 	if(fromBase)
 	{
-		Network::Bundle* pSendBundle = Network::Bundle::createPoolObject();
+		Network::Bundle* pSendBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		NETWORK_ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(id(), (*pSendBundle));
 		
 		ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(pSendBundle, ClientInterface::onUpdatePropertys, updatePropertys);
-		MemoryStream* s1 = MemoryStream::createPoolObject();
+		MemoryStream* s1 = MemoryStream::createPoolObject(OBJECTPOOL_POINT);
 		(*pSendBundle) << id();
 		
 		ENTITY_PROPERTY_UID spaceuid = ENTITY_BASE_PROPERTY_UTYPE_SPACEID;
@@ -2341,7 +2359,7 @@ void Entity::onUpdateDataFromClient(KBEngine::MemoryStream& s)
 		if(pW)
 		{
 			// 通知重置
-			Network::Bundle* pSendBundle = Network::Bundle::createPoolObject();
+			Network::Bundle* pSendBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 			NETWORK_ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(targetID, (*pSendBundle));
 			
 			ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(pSendBundle, ClientInterface::onSetEntityPosAndDir, setEntityPosAndDir);
@@ -3278,7 +3296,7 @@ void Entity::_sendBaseTeleportResult(ENTITY_ID sourceEntityID, COMPONENT_ID sour
 	Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(sourceBaseAppID);
 	if(cinfos != NULL && cinfos->pChannel != NULL)
 	{
-		Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		(*pBundle).newMessage(BaseappInterface::onTeleportCB);
 		(*pBundle) << sourceEntityID;
 		BaseappInterface::onTeleportCBArgs2::staticAddToBundle((*pBundle), spaceID, fromCellTeleport);
@@ -3559,7 +3577,7 @@ void Entity::teleportRefEntityCall(EntityCall* nearbyMBRef, Position3D& pos, Dir
 			// 同时需要通知base暂存发往cellapp的消息，因为后面如果跳转成功需要切换cellEntityCall映射关系到新的cellapp
 			// 为了避免在切换的一瞬间消息次序发生混乱(旧的cellapp消息也会转到新的cellapp上)， 因此需要在传送前进行
 			// 暂存， 传送成功后通知旧的cellapp销毁entity之后同时通知baseapp改变映射关系。
-			Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+			Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 			(*pBundle).newMessage(BaseappInterface::onMigrationCellappStart);
 			(*pBundle) << id();
 			(*pBundle) << g_componentID;
@@ -3582,7 +3600,7 @@ void Entity::teleportRefEntityCall(EntityCall* nearbyMBRef, Position3D& pos, Dir
 void Entity::onTeleportRefEntityCall(EntityCall* nearbyMBRef, Position3D& pos, Direction3D& dir)
 {
 	// 我们需要将entity打包发往目的cellapp
-	Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	(*pBundle).newMessage(CellappInterface::reqTeleportToCellApp);
 	(*pBundle) << id();
 	(*pBundle) << nearbyMBRef->id();
@@ -3592,8 +3610,21 @@ void Entity::onTeleportRefEntityCall(EntityCall* nearbyMBRef, Position3D& pos, D
 	(*pBundle) << dir.roll() << dir.pitch() << dir.yaw();
 	(*pBundle) << g_componentID;
 
-	MemoryStream* s = MemoryStream::createPoolObject();
-	changeToGhost(nearbyMBRef->componentID(), *s);
+	MemoryStream* s = MemoryStream::createPoolObject(OBJECTPOOL_POINT);
+
+	try
+	{ 
+		changeToGhost(nearbyMBRef->componentID(), *s);
+	}
+	catch (MemoryStreamWriteOverflow & err)
+	{
+		ERROR_MSG(fmt::format("{}::onTeleportRefEntityCall({}): {}\n",
+			scriptName(), id(), err.what()));
+
+		MemoryStream::reclaimPoolObject(s);
+		Network::Bundle::reclaimPoolObject(pBundle);
+		return;
+	}
 
 	(*pBundle).append(s);
 	MemoryStream::reclaimPoolObject(s);
@@ -3625,7 +3656,7 @@ void Entity::teleportLocal(PyObject_ptr nearbyMBRef, Position3D& pos, Direction3
 	if(this->pWitness())
 	{
 		// 通知位置强制改变
-		Network::Bundle* pSendBundle = Network::Bundle::createPoolObject();
+		Network::Bundle* pSendBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		NETWORK_ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(id(), (*pSendBundle));
 		
 		ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(pSendBundle, ClientInterface::onSetEntityPosAndDir, setEntityPosAndDir);
@@ -3660,7 +3691,7 @@ void Entity::teleportLocal(PyObject_ptr nearbyMBRef, Position3D& pos, Direction3
 			continue;
 
 		// 通知位置强制改变
-		Network::Bundle* pSendBundle = Network::Bundle::createPoolObject();
+		Network::Bundle* pSendBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		NETWORK_ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(pEntity->id(), (*pSendBundle));
 		
 		ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(pSendBundle, ClientInterface::onSetEntityPosAndDir, setEntityPosAndDir);
@@ -4074,11 +4105,11 @@ void Entity::createFromStream(KBEngine::MemoryStream& s)
 
 	removeFlags(ENTITY_FLAGS_INITING);
 	
-	createEventsFromStream(s);
 	createMovementHandlerFromStream(s);
 	createControllersFromStream(s);
 	createWitnessFromStream(s);
 	createTimersFromStream(s);
+	createEventsFromStream(s);
 
 	pyCallbackMgr_.createFromStream(s);
 	setDirty();
@@ -4221,7 +4252,7 @@ void Entity::createWitnessFromStream(KBEngine::MemoryStream& s)
 
 		// 不要使用setWitness，因为此时不需要走onAttach流程，客户端不需要重新enterworld。
 		// setWitness(Witness::createPoolObject());
-		pWitness_ = Witness::createPoolObject();
+		pWitness_ = Witness::createPoolObject(OBJECTPOOL_POINT);
 		pWitness_->pEntity(this);
 		pWitness_->createFromStream(s);
 	}

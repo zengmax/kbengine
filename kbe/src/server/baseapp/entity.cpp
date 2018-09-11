@@ -128,11 +128,11 @@ void Entity::onDefDataChanged(EntityComponent* pEntityComponent, const PropertyD
 		return;
 
 	// 创建一个需要广播的模板流
-	MemoryStream* mstream = MemoryStream::createPoolObject();
+	MemoryStream* mstream = MemoryStream::createPoolObject(OBJECTPOOL_POINT);
 
 	propertyDescription->getDataType()->addToStream(mstream, pyData);
 
-	Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	(*pBundle).newMessage(ClientInterface::onUpdatePropertys);
 	(*pBundle) << id();
 
@@ -191,7 +191,7 @@ void Entity::eraseEntityLog()
 	// 需要判断dbid是否大于0， 如果大于0则应该要去擦除在线等记录情况.
 	if(this->dbid() > 0)
 	{
-		Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		(*pBundle).newMessage(DbmgrInterface::onEntityOffline);
 		(*pBundle) << this->dbid();
 		(*pBundle) << this->pScriptModule()->getUType();
@@ -337,36 +337,52 @@ void Entity::addCellDataToStream(COMPONENT_TYPE sendTo, uint32 flags, MemoryStre
 		{
 			PyObject* pyVal = PyDict_GetItemString(cellDataDict_, propertyDescription->getName());
 
-			if(useAliasID && pScriptModule_->usePropertyDescrAlias())
-			{
-				(*s) << (uint8)0;
-				(*s) << propertyDescription->aliasIDAsUint8();
-			}
-			else
-			{
-				(*s) << (ENTITY_PROPERTY_UID)0;
-				(*s) << propertyDescription->getUType();
-			}
 
 			if (propertyDescription->getDataType()->type() == DATA_TYPE_ENTITY_COMPONENT)
 			{
+				// 由于存在一种情况， 组件def中没有内容， 但有cell脚本，此时baseapp上无法判断他是否有cell属性，所以写celldata时没有数据写入
 				EntityComponentType* pEntityComponentType = (EntityComponentType*)propertyDescription->getDataType();
+				if (pEntityComponentType->pScriptDefModule()->getCellPropertyDescriptions().size() == 0)
+					continue;
+
+				if (useAliasID && pScriptModule_->usePropertyDescrAlias())
+				{
+					(*s) << (uint8)0;
+					(*s) << propertyDescription->aliasIDAsUint8();
+				}
+				else
+				{
+					(*s) << (ENTITY_PROPERTY_UID)0;
+					(*s) << propertyDescription->getUType();
+				}
+
 				pEntityComponentType->addCellDataToStream(s, flags, pyVal, this->id(), propertyDescription, sendTo, true);
 			}
 			else
 			{
-				if (!propertyDescription->getDataType()->isSameType(pyVal))
+				if (useAliasID && pScriptModule_->usePropertyDescrAlias())
+				{
+					(*s) << (uint8)0;
+					(*s) << propertyDescription->aliasIDAsUint8();
+				}
+				else
+				{
+					(*s) << (ENTITY_PROPERTY_UID)0;
+					(*s) << propertyDescription->getUType();
+				}
+
+				if (!propertyDescription->isSameType(pyVal))
 				{
 					ERROR_MSG(fmt::format("{}::addCellDataToStream: {}({}) not is ({})!\n", this->scriptName(),
 						propertyDescription->getName(), (pyVal ? pyVal->ob_type->tp_name : "unknown"), propertyDescription->getDataType()->getName()));
 
-					PyObject* pydefval = propertyDescription->getDataType()->parseDefaultStr("");
-					propertyDescription->getDataType()->addToStream(s, pydefval);
+					PyObject* pydefval = propertyDescription->parseDefaultStr("");
+					propertyDescription->addToStream(s, pydefval);
 					Py_DECREF(pydefval);
 				}
 				else
 				{
-					propertyDescription->getDataType()->addToStream(s, pyVal);
+					propertyDescription->addToStream(s, pyVal);
 				}
 			}
 
@@ -410,13 +426,6 @@ void Entity::addPersistentsDataToStream(uint32 flags, MemoryStream* s)
 		if(propertyDescription->isPersistent() && (flags & propertyDescription->getFlags()) > 0)
 		{
 			bool isComponent = propertyDescription->getDataType()->type() == DATA_TYPE_ENTITY_COMPONENT;
-			if (isComponent)
-			{
-				// 由于存在一种情况， 组件def中没有内容， 但有cell脚本，此时baseapp上无法判断他是否有cell属性，所以写celldata时没有数据写入
-				EntityComponentType* pEntityComponentType = (EntityComponentType*)propertyDescription->getDataType();
-				if (pEntityComponentType->pScriptDefModule()->getPropertyDescrs().size() == 0 && pEntityComponentType->pScriptDefModule()->getCellPropertyDescriptions().size() == 0)
-					continue;
-			}
 
 			PyObject *key = PyUnicode_FromString(attrname);
 
@@ -466,18 +475,22 @@ void Entity::addPersistentsDataToStream(uint32 flags, MemoryStream* s)
 				}
 				else
 				{
-					PyObject* pyVal = PyDict_GetItemString(cellDataDict_, attrname);
-					if (!propertyDescription->isSamePersistentType(pyVal))
+					// 一些实体没有cell部分， 因此cell属性忽略
+					if (cellDataDict_)
 					{
-						CRITICAL_MSG(fmt::format("{}::addPersistentsDataToStream: {} persistent({}) type(curr_py: {} != {}) error.\n",
-							this->scriptName(), this->id(), attrname, (pyVal ? pyVal->ob_type->tp_name : "unknown"), propertyDescription->getDataType()->getName()));
-					}
-					else
-					{
-						(*s) << (ENTITY_PROPERTY_UID)0 << propertyDescription->getUType();
-						log.push_back(propertyDescription->getUType());
-						propertyDescription->addPersistentToStream(s, pyVal);
-						DEBUG_PERSISTENT_PROPERTY("addCellPersistentsDataToStream", attrname);
+						PyObject* pyVal = PyDict_GetItemString(cellDataDict_, attrname);
+						if (!propertyDescription->isSamePersistentType(pyVal))
+						{
+							CRITICAL_MSG(fmt::format("{}::addPersistentsDataToStream: {} persistent({}) type(curr_py: {} != {}) error.\n",
+								this->scriptName(), this->id(), attrname, (pyVal ? pyVal->ob_type->tp_name : "unknown"), propertyDescription->getDataType()->getName()));
+						}
+						else
+						{
+							(*s) << (ENTITY_PROPERTY_UID)0 << propertyDescription->getUType();
+							log.push_back(propertyDescription->getUType());
+							propertyDescription->addPersistentToStream(s, pyVal);
+							DEBUG_PERSISTENT_PROPERTY("addCellPersistentsDataToStream", attrname);
+						}
 					}
 				}
 			}
@@ -566,7 +579,7 @@ bool Entity::destroyCellEntity(void)
 		return false;
 	}
 
-	Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	(*pBundle).newMessage(CellappInterface::onDestroyCellEntityFromBaseapp);
 	(*pBundle) << id_;
 	sendToCellapp(pBundle);
@@ -615,6 +628,7 @@ PyObject* Entity::__py_pyDestroyEntity(PyObject* self, PyObject* args, PyObject 
 	{
 		PyErr_Format(PyExc_AssertionError, "%s::destroy: %d is destroyed!\n",
 			pobj->scriptName(), pobj->id());
+
 		PyErr_PrintEx(0);
 		return NULL;
 	}
@@ -623,8 +637,8 @@ PyObject* Entity::__py_pyDestroyEntity(PyObject* self, PyObject* args, PyObject 
 	{
 		PyErr_Format(PyExc_Exception, "%s::destroy: id:%i has cell! creatingCell=%s\n", 
 			pobj->scriptName(), pobj->id(),
-
 			pobj->creatingCell() ? "true" : "false");
+
 		PyErr_PrintEx(0);
 		return NULL;
 	}
@@ -637,6 +651,7 @@ PyObject* Entity::__py_pyDestroyEntity(PyObject* self, PyObject* args, PyObject 
 	{
 		PyErr_Format(PyExc_AssertionError, "%s::destroy: %d ParseTupleAndKeywords(deleteFromDB, &writeToDB) error!\n",
 			pobj->scriptName(), pobj->id());
+
 		PyErr_PrintEx(0);
 		return NULL;
 	}
@@ -656,6 +671,7 @@ PyObject* Entity::__py_pyDestroyEntity(PyObject* self, PyObject* args, PyObject 
 			PyErr_Format(PyExc_AssertionError, "%s::destroy: id:%i has db, current dbid is 0. "
 				"please wait for dbmgr to processing!\n", 
 				pobj->scriptName(), pobj->id());
+
 			PyErr_PrintEx(0);
 			return NULL;
 		}
@@ -684,7 +700,7 @@ void Entity::onDestroyEntity(bool deleteFromDB, bool writeToDB)
 			return;
 		}
 
-		Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		(*pBundle).newMessage(DbmgrInterface::removeEntity);
 		
 		(*pBundle) << this->dbInterfaceIndex();
@@ -1072,7 +1088,7 @@ void Entity::reqBackupCellData()
 	if(mb == NULL)
 		return;
 
-	Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	(*pBundle).newMessage(CellappInterface::reqBackupEntityCellData);
 	(*pBundle) << this->id();
 	sendToCellapp(pBundle);
@@ -1195,7 +1211,7 @@ void Entity::writeToDB(void* data, void* extra1, void* extra2)
 	}
 	else
 	{
-		Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		(*pBundle).newMessage(CellappInterface::reqWriteToDBFromBaseapp);
 		(*pBundle) << this->id();
 		(*pBundle) << callbackID;
@@ -1295,13 +1311,26 @@ void Entity::onCellWriteToDBCompleted(CALLBACK_ID callbackID, int8 shouldAutoLoa
 	{
 		ERROR_MSG(fmt::format("{}::onCellWriteToDBCompleted({}): not found dbmgr!\n", 
 			this->scriptName(), this->id()));
+
 		return;
 	}
 	
-	MemoryStream* s = MemoryStream::createPoolObject();
-	addPersistentsDataToStream(ED_FLAG_ALL, s);
+	MemoryStream* s = MemoryStream::createPoolObject(OBJECTPOOL_POINT);
 
-	Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+	try
+	{
+		addPersistentsDataToStream(ED_FLAG_ALL, s);
+	}
+	catch (MemoryStreamWriteOverflow & err)
+	{
+		ERROR_MSG(fmt::format("{}::onCellWriteToDBCompleted({}): {}\n",
+			this->scriptName(), this->id(), err.what()));
+
+		MemoryStream::reclaimPoolObject(s);
+		return;
+	}
+
+	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	(*pBundle).newMessage(DbmgrInterface::writeEntity);
 
 	(*pBundle) << g_componentID;
@@ -1466,7 +1495,7 @@ void Entity::forwardEntityMessageToCellappFromClient(Network::Channel* pChannel,
 
 	// 将这个消息再打包转寄给cellapp， cellapp会对这个包中的每个消息进行判断
 	// 检查是否是entity消息， 否则不合法.
-	Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	(*pBundle).newMessage(CellappInterface::forwardEntityMessageToCellappFromClient);
 	(*pBundle) << this->id();
 	(*pBundle).append(s);
@@ -1533,7 +1562,7 @@ PyObject* Entity::pyTeleport(PyObject* baseEntityMB)
 
 		eid = mb->id();
 
-		Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		(*pBundle).newMessage(BaseappInterface::reqTeleportOther);
 		(*pBundle) << eid;
 
@@ -1636,7 +1665,7 @@ void Entity::reqTeleportOther(Network::Channel* pChannel, ENTITY_ID reqTeleportE
 		return;
 	}
 
-	Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	(*pBundle).newMessage(CellappInterface::teleportFromBaseapp);
 	(*pBundle) << reqTeleportEntityID;
 
@@ -1703,7 +1732,7 @@ void Entity::onMigrationCellappOver(COMPONENT_ID targetCellAppID)
 	Components::ComponentInfos* pInfos = Components::getSingleton().findComponent(targetCellAppID);
 	if (pInfos && pInfos->pChannel)
 	{
-		Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		(*pBundle).newMessage(CellappInterface::reqTeleportToCellAppOver);
 		(*pBundle) << id();
 		pInfos->pChannel->send(pBundle);

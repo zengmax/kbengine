@@ -5,7 +5,7 @@
 #include "KBECommon.h"
 
 class MemoryStream;
-class NetworkInterface;
+class NetworkInterfaceBase;
 class Message;
 
 /*
@@ -27,7 +27,7 @@ public:
 	void fini(bool issend);
 
 	void writeMsgLength();
-	void send(NetworkInterface* pNetworkInterface);
+	void send(NetworkInterfaceBase* pNetworkInterface);
 
 	void checkStream(uint32 v);
 
@@ -118,6 +118,16 @@ public:
 	void writePython(const TArray<uint8>& v)
 	{
 		appendBlob(v);
+	}
+
+	void writeEntitycall(const TArray<uint8>& v)
+	{
+		uint64 cid = 0;
+		int32 id = 0;
+		uint16 type = 0;
+		uint16 utype = 0;
+
+		(*this) << cid << id << type << utype;
 	}
 
 	void writeVector2(const FVector2D& v);

@@ -94,6 +94,7 @@ bool EntityDef::finalise(bool isReload)
 		EntityDef::__oldScriptTypeMappingUType.clear();
 	}
 
+	g_scriptUtype = 1;
 	EntityDef::__scriptModules.clear();
 	EntityDef::__scriptTypeMappingUType.clear();
 	g_methodCusUtypes.clear();
@@ -456,15 +457,26 @@ bool EntityDef::loadInterfaces(const std::string& defFilePath,
 
 	XML_FOR_BEGIN(implementsNode)
 	{
-		if (defxml->getKey(implementsNode) != "Interface" && defxml->getKey(implementsNode) != "Type")
+		if (defxml->getKey(implementsNode) != "interface" && defxml->getKey(implementsNode) != "Interface" && 
+			defxml->getKey(implementsNode) != "type" && defxml->getKey(implementsNode) != "Type")
 			continue;
 
 		TiXmlNode* interfaceNode = defxml->enterNode(implementsNode, "Interface");
 		if (!interfaceNode)
 		{
-			interfaceNode = defxml->enterNode(implementsNode, "Type");
+			interfaceNode = defxml->enterNode(implementsNode, "interface");
 			if (!interfaceNode)
-				continue;
+			{
+				interfaceNode = defxml->enterNode(implementsNode, "Type");
+				if (!interfaceNode)
+				{
+					interfaceNode = defxml->enterNode(implementsNode, "type");
+					if (!interfaceNode)
+					{
+						continue;
+					}
+				}
+			}
 		}
 
 		std::string interfaceName = defxml->getKey(interfaceNode);
@@ -667,6 +679,8 @@ bool EntityDef::loadComponents(const std::string& defFilePath,
 			return false;
 		}
 		
+		pCompScriptDefModule->autoMatchCompOwn();
+
 		flags = ED_FLAG_UNKOWN;
 
 		if (pCompScriptDefModule->hasBase())
@@ -1846,13 +1860,22 @@ ERASE_PROPERTYS:
 							uint32 flags = compPropertyInter->second->getFlags();
 
 							if (g_componentType == BASEAPP_TYPE)
+							{
 								flags &= ~ENTITY_BASE_DATA_FLAGS;
+								flags &= ~ED_FLAG_BASE_AND_CLIENT;
+							}
 							else if (g_componentType == CELLAPP_TYPE)
+							{
 								flags &= ~ENTITY_CELL_DATA_FLAGS;
+								flags &= ~(ED_FLAG_ALL_CLIENTS | ED_FLAG_CELL_PUBLIC_AND_OWN | ED_FLAG_OTHER_CLIENTS | ED_FLAG_OWN_CLIENT);
+							}
 							else
+							{
 								flags &= ~ENTITY_CLIENT_DATA_FLAGS;
+							}
 
 							compPropertyInter->second->setFlags(flags);
+							compPropertyInter->second->decRef();
 
 							propertyDescrs.erase(compPropertyInter++);
 							continue;
@@ -1891,10 +1914,16 @@ ERASE_PROPERTYS:
   					if (g_componentType == BASEAPP_TYPE)
 					{
 						pflags |= ENTITY_BASE_DATA_FLAGS;
+
+						if(pCompScriptModule->hasClient())
+							pflags |= ED_FLAG_BASE_AND_CLIENT;
 					}
 					else if (g_componentType == CELLAPP_TYPE)
 					{
 						pflags |= ENTITY_CELL_DATA_FLAGS;
+
+						if (pCompScriptModule->hasClient())
+							pflags |= (ED_FLAG_ALL_CLIENTS | ED_FLAG_CELL_PUBLIC_AND_OWN | ED_FLAG_OTHER_CLIENTS | ED_FLAG_OWN_CLIENT);
 					}
 					else
 					{
@@ -1902,6 +1931,16 @@ ERASE_PROPERTYS:
 					}
 
 					pComponentPropertyDescription->setFlags(pflags);
+					if (pComponentPropertyDescription->isPersistent() && pCompScriptModule->numPropertys() == 0)
+					{
+						pComponentPropertyDescription->isPersistent(false);
+
+						if ((*entityScriptModuleIter)->findPersistentPropertyDescription(pComponentPropertyDescription->getUType()))
+						{
+							(*entityScriptModuleIter)->getPersistentPropertyDescriptions().erase(pComponentPropertyDescription->getName());
+							(*entityScriptModuleIter)->getPersistentPropertyDescriptions_uidmap().erase(pComponentPropertyDescription->getUType());
+						}
+					}
 
 					if ((*entityScriptModuleIter)->findPropertyDescription(pComponentPropertyDescription->getName(), g_componentType) != pComponentPropertyDescription)
 					{

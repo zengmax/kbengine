@@ -219,6 +219,10 @@ public:
 		return &dbin_iter->second;
 	}
 
+	virtual void onChannelDeregister(Network::Channel * pChannel);
+
+	InterfacesHandler* findBestInterfacesHandler();
+
 protected:
 	TimerHandle											loopCheckTimerHandle_;
 	TimerHandle											mainProcessTimer_;
@@ -245,13 +249,14 @@ protected:
 	uint32												numExecuteRawDatabaseCommand_;
 	uint32												numCreatedAccount_;
 
-	InterfacesHandler*									pInterfacesAccountHandler_;
-	InterfacesHandler*									pInterfacesChargeHandler_;
+	std::vector<InterfacesHandler*>						pInterfacesHandlers_;
 
 	SyncAppDatasHandler*								pSyncAppDatasHandler_;
 	UpdateDBServerLogHandler*							pUpdateDBServerLogHandler_;
 	
 	TelnetServer*										pTelnetServer_;
+
+	std::map<COMPONENT_ID, uint64>						loseBaseappts_;
 };
 
 }

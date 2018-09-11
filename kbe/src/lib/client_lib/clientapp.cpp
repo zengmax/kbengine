@@ -54,7 +54,6 @@ threadPool_(),
 entryScript_(),
 state_(C_STATE_INIT)
 {
-	networkInterface_.pExtensionData(this);
 	networkInterface_.pChannelTimeOutHandler(this);
 	networkInterface_.pChannelDeregisterHandler(this);
 
@@ -397,7 +396,7 @@ void ClientApp::handleGameTick()
 				if(ret)
 				{
 					// 先握手然后等helloCB之后再进行登录
-					Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+					Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 					(*pBundle).newMessage(BaseappInterface::hello);
 					(*pBundle) << KBEVersion::versionString();
 					(*pBundle) << KBEVersion::scriptVersionString();
@@ -578,8 +577,9 @@ void ClientApp::onChannelDeregister(Network::Channel * pChannel)
 void ClientApp::onChannelTimeOut(Network::Channel * pChannel)
 {
 	INFO_MSG(fmt::format("ClientApp::onChannelTimeOut: "
-		"Channel {} timed out.\n", pChannel->c_str()));
+		"Channel {} timeout!\n", pChannel->c_str()));
 
+	pChannel->condemn("timedout");
 	networkInterface_.deregisterChannel(pChannel);
 	pChannel->destroy();
 	Network::Channel::reclaimPoolObject(pChannel);
@@ -654,7 +654,7 @@ bool ClientApp::login(std::string accountName, std::string passwd, std::string d
 	if(ret)
 	{
 		// 先握手然后等helloCB之后再进行登录
-		Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		(*pBundle).newMessage(LoginappInterface::hello);
 		(*pBundle) << KBEVersion::versionString();
 		(*pBundle) << KBEVersion::scriptVersionString();

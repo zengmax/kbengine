@@ -37,6 +37,7 @@ Interfaces::Interfaces(Network::EventDispatcher& dispatcher,
 	reqAccountLogin_requests_(),
 	pTelnetServer_(NULL)
 {
+	KBEngine::Network::MessageHandlers::pMainMessageHandlers = &InterfacesInterface::messageHandlers;
 }
 
 //-------------------------------------------------------------------------------------
@@ -193,6 +194,12 @@ bool Interfaces::initDB()
 //-------------------------------------------------------------------------------------
 void Interfaces::finalise()
 {
+	if (pTelnetServer_)
+	{
+		pTelnetServer_->stop();
+		SAFE_RELEASE(pTelnetServer_);
+	}
+
 	PythonApp::finalise();
 }
 
@@ -255,6 +262,8 @@ void Interfaces::reqCreateAccount(Network::Channel* pChannel, KBEngine::MemorySt
 
 	// 把请求交由脚本处理
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
+	SCOPED_PROFILE(SCRIPTCALL_CREATEACCOUNT_PROFILE);
+
 	PyObject* pyResult = PyObject_CallMethod(getEntryScript().get(), 
 										const_cast<char*>("onRequestCreateAccount"), 
 										const_cast<char*>("ssy#"), 
@@ -288,7 +297,7 @@ void Interfaces::createAccountResponse(std::string commitName, std::string realA
 
 	CreateAccountTask *task = iter->second;
 
-	Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 
 	(*pBundle).newMessage(DbmgrInterface::onCreateAccountCBFromInterfaces);
 	(*pBundle) << task->baseappID << commitName << realAccountName << task->password << errorCode;
@@ -365,6 +374,8 @@ void Interfaces::onAccountLogin(Network::Channel* pChannel, KBEngine::MemoryStre
 
 	// 把请求交由脚本处理
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
+	SCOPED_PROFILE(SCRIPTCALL_ACCOUNTLOGIN_PROFILE);
+
 	PyObject* pyResult = PyObject_CallMethod(getEntryScript().get(), 
 										const_cast<char*>("onRequestAccountLogin"), 
 										const_cast<char*>("ssy#"), 
@@ -398,7 +409,7 @@ void Interfaces::accountLoginResponse(std::string commitName, std::string realAc
 
 	LoginAccountTask *task = iter->second;
 
-	Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	
 	(*pBundle).newMessage(DbmgrInterface::onLoginAccountCBBFromInterfaces);
 	(*pBundle) << task->baseappID << commitName << realAccountName << task->password << errorCode;
@@ -478,6 +489,8 @@ void Interfaces::charge(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 	
 	// 把请求交由脚本处理
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
+	SCOPED_PROFILE(SCRIPTCALL_CHARGE_PROFILE);
+
 	PyObject* pyResult = PyObject_CallMethod(getEntryScript().get(), 
 										const_cast<char*>("onRequestCharge"), 
 										const_cast<char*>("sKy#"), 
@@ -518,7 +531,7 @@ void Interfaces::chargeResponse(std::string orderID, std::string extraDatas, KBE
 					DBID dbid = 0;
 					CALLBACK_ID cbid = 0;
 
-					Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+					Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 
 					(*pBundle).newMessage(DbmgrInterface::onChargeCB);
 					(*pBundle) << baseappID << orderID << dbid;
@@ -541,7 +554,7 @@ void Interfaces::chargeResponse(std::string orderID, std::string extraDatas, KBE
 	KBEShared_ptr<Orders> orders = iter->second;
 	orders->getDatas = extraDatas;
 
-	Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 
 	(*pBundle).newMessage(DbmgrInterface::onChargeCB);
 	(*pBundle) << orders->baseappID << orders->ordersID << orders->dbid;

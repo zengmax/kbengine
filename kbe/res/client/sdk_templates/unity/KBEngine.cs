@@ -25,7 +25,7 @@
 	public class KBEngineApp
 	{
 		public static KBEngineApp app = null;
-		private NetworkInterface _networkInterface = null;
+		private NetworkInterfaceBase _networkInterface = null;
         
         KBEngineArgs _args = null;
         
@@ -61,8 +61,9 @@
 		
 		// 服务端分配的baseapp地址
 		public string baseappIP = "";
-		public UInt16 baseappPort = 0;
-		
+		public UInt16 baseappTcpPort = 0;
+		public UInt16 baseappUdpPort = 0;
+
 		// 当前状态
 		public string currserver = "";
 		public string currstate = "";
@@ -112,6 +113,10 @@
 		private System.DateTime _lastTickCBTime = System.DateTime.Now;
 		private System.DateTime _lastUpdateToServerTime = System.DateTime.Now;
 		
+		//上传玩家信息到服务器间隔，单位毫秒
+        private float _updatePlayerToServerPeroid = 100.0f;
+		private const int _1MS_TO_100NS = 10000;
+
 		// 玩家当前所在空间的id， 以及空间对应的资源
 		public UInt32 spaceID = 0;
 		public string spaceResPath = "";
@@ -130,10 +135,21 @@
 			initialize(args);
         }
 
+		public static KBEngineApp getSingleton() 
+		{
+			if(KBEngineApp.app == null)
+			{
+				throw new Exception("Please create KBEngineApp!");
+			}
+
+			return KBEngineApp.app;
+		}
+
 		public virtual bool initialize(KBEngineArgs args)
 		{
 			_args = args;
-			
+			_updatePlayerToServerPeroid = (float)_args.syncPlayerMS;
+
 			EntityDef.init();
 
         	initNetwork();
@@ -147,13 +163,14 @@
 		void initNetwork()
 		{
 			Messages.init();
-        	_networkInterface = new NetworkInterface();
+			_networkInterface = new NetworkInterfaceTCP();
 		}
 		
 		void installEvents()
 		{
 			Event.registerIn("createAccount", this, "createAccount");
 			Event.registerIn("login", this, "login");
+			Event.registerIn("logout", this, "logout");
 			Event.registerIn("reloginBaseapp", this, "reloginBaseapp");
 			Event.registerIn("resetPassword", this, "resetPassword");
 			Event.registerIn("bindAccountEmail", this, "bindAccountEmail");
@@ -172,6 +189,9 @@
         {
         	Dbg.WARNING_MSG("KBEngine::destroy()");
         	
+			if(currserver == "baseapp")
+				logout();
+			
         	reset();
         	KBEngine.Event.deregisterIn(this);
         	resetMessages();
@@ -179,7 +199,7 @@
         	KBEngineApp.app = null;
         }
         
-        public NetworkInterface networkInterface()
+        public NetworkInterfaceBase networkInterface()
         {
         	return _networkInterface;
         }
@@ -234,7 +254,7 @@
 			if (_networkInterface != null)
 				_networkInterface.reset();
 
-			_networkInterface = new NetworkInterface();
+			_networkInterface = new NetworkInterfaceTCP();
 			
 			_spacedatas.Clear();
 		}
@@ -273,7 +293,7 @@
 			return null;
 		}
 
-		public void _closeNetwork(NetworkInterface networkInterface)
+		public void _closeNetwork(NetworkInterfaceBase networkInterface)
 		{
 			networkInterface.close();
 		}
@@ -363,16 +383,37 @@
 		*/
 		public void Client_onHelloCB(MemoryStream stream)
 		{
-			serverVersion = stream.readString();
+			string str_serverVersion = stream.readString();
 			serverScriptVersion = stream.readString();
-			serverProtocolMD5 = stream.readString();
-			serverEntitydefMD5 = stream.readString();
+			string currentServerProtocolMD5 = stream.readString();
+			string currentServerEntitydefMD5 = stream.readString();
 			Int32 ctype = stream.readInt32();
 			
-			Dbg.DEBUG_MSG("KBEngine::Client_onHelloCB: verInfo(" + serverVersion 
+			Dbg.DEBUG_MSG("KBEngine::Client_onHelloCB: verInfo(" + str_serverVersion 
 				+ "), scriptVersion("+ serverScriptVersion + "), srvProtocolMD5("+ serverProtocolMD5 
 				+ "), srvEntitydefMD5("+ serverEntitydefMD5 + "), + ctype(" + ctype + ")!");
 			
+			if(str_serverVersion != "Getting")
+			{
+				serverVersion = str_serverVersion;
+
+				/* 
+				if(serverProtocolMD5 != currentServerProtocolMD5)
+				{
+					Dbg.ERROR_MSG("Client_onHelloCB: digest not match! serverProtocolMD5=" + serverProtocolMD5 + "(server: " + currentServerProtocolMD5 + ")");
+					Event.fireAll("onVersionNotMatch", new object[] { clientVersion, serverVersion });
+					return;
+				}
+				*/
+				
+				if (serverEntitydefMD5 != currentServerEntitydefMD5)
+				{
+					Dbg.ERROR_MSG("Client_onHelloCB: digest not match! serverEntitydefMD5=" + serverEntitydefMD5 + "(server: " + currentServerEntitydefMD5 + ")");
+					Event.fireAll("onVersionNotMatch", new object[] { clientVersion, serverVersion });
+					return;
+				}
+			}
+
 			onServerDigest();
 			
 			if(currserver == "baseapp")
@@ -481,14 +522,14 @@
 			
 			if(!success)
 			{
-				Dbg.ERROR_MSG(string.Format("KBEngine::login_loginapp(): connect {0}:{1} is error!", ip, port));  
+				Dbg.ERROR_MSG(string.Format("KBEngine::login_loginapp(): connect {0}:{1} error!", ip, port));  
 				return;
 			}
 			
 			currserver = "loginapp";
 			currstate = "login";
 			
-			Dbg.DEBUG_MSG(string.Format("KBEngine::login_loginapp(): connect {0}:{1} is success!", ip, port));
+			Dbg.DEBUG_MSG(string.Format("KBEngine::login_loginapp(): connect {0}:{1} success!", ip, port));
 
 			hello();
 		}
@@ -509,8 +550,17 @@
 				Event.fireOut("onLoginBaseapp", new object[]{});
 				
 				_networkInterface.reset();
-				_networkInterface = new NetworkInterface();
-				_networkInterface.connectTo(baseappIP, baseappPort, onConnectTo_baseapp_callback, null);
+
+				if(_args.forceDisableUDP || baseappUdpPort == 0)
+				{
+					_networkInterface = new NetworkInterfaceTCP();
+					_networkInterface.connectTo(baseappIP, baseappTcpPort, onConnectTo_baseapp_callback, null);
+				}
+				else
+				{
+					_networkInterface = new NetworkInterfaceKCP();
+					_networkInterface.connectTo(baseappIP, baseappUdpPort, onConnectTo_baseapp_callback, null);
+				}
 			}
 			else
 			{
@@ -528,14 +578,14 @@
 			
 			if(!success)
 			{
-				Dbg.ERROR_MSG(string.Format("KBEngine::login_baseapp(): connect {0}:{1} is error!", ip, port));
+				Dbg.ERROR_MSG(string.Format("KBEngine::login_baseapp(): connect {0}:{1} error!", ip, port));
 				return;
 			}
 			
 			currserver = "baseapp";
 			currstate = "";
 			
-			Dbg.DEBUG_MSG(string.Format("KBEngine::login_baseapp(): connect {0}:{1} is successfully!", ip, port));
+			Dbg.DEBUG_MSG(string.Format("KBEngine::login_baseapp(): connect {0}:{1} success!", ip, port));
 
 			hello();
 		}
@@ -551,24 +601,38 @@
 			一些移动类应用容易掉线，可以使用该功能快速的重新与服务端建立通信
 		*/
 		public void reloginBaseapp()
-		{  
+		{
+			_lastTickTime = System.DateTime.Now;
+			_lastTickCBTime = System.DateTime.Now;
+
 			if(_networkInterface.valid())
 				return;
 
 			Event.fireAll("onReloginBaseapp", new object[]{});
-			_networkInterface.connectTo(baseappIP, baseappPort, onReConnectTo_baseapp_callback, null);
+
+			_networkInterface.reset();
+
+			if(_args.forceDisableUDP || baseappUdpPort == 0)
+			{
+				_networkInterface = new NetworkInterfaceTCP();
+				_networkInterface.connectTo(baseappIP, baseappTcpPort, onReConnectTo_baseapp_callback, null);
+			}
+			else
+			{
+				_networkInterface = new NetworkInterfaceKCP();
+				_networkInterface.connectTo(baseappIP, baseappUdpPort, onReConnectTo_baseapp_callback, null);
+			}
 		}
 
 		private void onReConnectTo_baseapp_callback(string ip, int port, bool success, object userData)
 		{
 			if(!success)
 			{
-				Dbg.ERROR_MSG(string.Format("KBEngine::reloginBaseapp(): connect {0}:{1} is error!", ip, port));
+				Dbg.ERROR_MSG(string.Format("KBEngine::reloginBaseapp(): connect {0}:{1} error!", ip, port));
 				return;
 			}
 			
-			
-			Dbg.DEBUG_MSG(string.Format("KBEngine::relogin_baseapp(): connect {0}:{1} is successfully!", ip, port));
+			Dbg.DEBUG_MSG(string.Format("KBEngine::relogin_baseapp(): connect {0}:{1} success!", ip, port));
 
 			Bundle bundle = Bundle.createObject();
 			bundle.newMessage(Messages.messages["Baseapp_reloginBaseapp"]);
@@ -579,6 +643,18 @@
 			bundle.send(_networkInterface);
 			
 			_lastTickCBTime = System.DateTime.Now;
+		}
+
+		/*
+			登出baseapp
+		*/
+		public void logout()
+		{
+			Bundle bundle = Bundle.createObject();
+			bundle.newMessage(Messages.messages["Baseapp_logoutBaseapp"]);
+			bundle.writeUint64(entity_uuid);
+			bundle.writeInt32(entity_id);
+			bundle.send(_networkInterface);
 		}
 
 		/*
@@ -633,11 +709,11 @@
 			
 			if(!success)
 			{
-				Dbg.ERROR_MSG(string.Format("KBEngine::resetpassword_loginapp(): connect {0}:{1} is error!", ip, port));
+				Dbg.ERROR_MSG(string.Format("KBEngine::resetpassword_loginapp(): connect {0}:{1} error!", ip, port));
 				return;
 			}
 			
-			Dbg.DEBUG_MSG(string.Format("KBEngine::resetpassword_loginapp(): connect {0}:{1} is success!", ip, port)); 
+			Dbg.DEBUG_MSG(string.Format("KBEngine::resetpassword_loginapp(): connect {0}:{1} success!", ip, port)); 
 			onOpenLoginapp_resetpassword();
 		}
 		
@@ -645,11 +721,11 @@
 		{
 			if(failcode != 0)
 			{
-				Dbg.ERROR_MSG("KBEngine::Client_onReqAccountResetPasswordCB: " + username + " is failed! code=" + failcode + "!");
+				Dbg.ERROR_MSG("KBEngine::Client_onReqAccountResetPasswordCB: " + username + " failed! code=" + failcode + "!");
 				return;
 			}
 	
-			Dbg.DEBUG_MSG("KBEngine::Client_onReqAccountResetPasswordCB: " + username + " is successfully!");
+			Dbg.DEBUG_MSG("KBEngine::Client_onReqAccountResetPasswordCB: " + username + " success!");
 		}
 		
 		/*
@@ -669,11 +745,11 @@
 		{
 			if(failcode != 0)
 			{
-				Dbg.ERROR_MSG("KBEngine::Client_onReqAccountBindEmailCB: " + username + " is failed! code=" + failcode + "!");
+				Dbg.ERROR_MSG("KBEngine::Client_onReqAccountBindEmailCB: " + username + " failed! code=" + failcode + "!");
 				return;
 			}
 
-			Dbg.DEBUG_MSG("KBEngine::Client_onReqAccountBindEmailCB: " + username + " is successfully!");
+			Dbg.DEBUG_MSG("KBEngine::Client_onReqAccountBindEmailCB: " + username + " success!");
 		}
 		
 		/*
@@ -693,11 +769,11 @@
 		{
 			if(failcode != 0)
 			{
-				Dbg.ERROR_MSG("KBEngine::Client_onReqAccountNewPasswordCB: " + username + " is failed! code=" + failcode + "!");
+				Dbg.ERROR_MSG("KBEngine::Client_onReqAccountNewPasswordCB: " + username + " failed! code=" + failcode + "!");
 				return;
 			}
 	
-			Dbg.DEBUG_MSG("KBEngine::Client_onReqAccountNewPasswordCB: " + username + " is successfully!");
+			Dbg.DEBUG_MSG("KBEngine::Client_onReqAccountNewPasswordCB: " + username + " success!");
 		}
 
 		public void createAccount(string username, string password, byte[] datas)
@@ -746,11 +822,11 @@
 			
 			if(!success)
 			{
-				Dbg.ERROR_MSG(string.Format("KBEngine::createAccount_loginapp(): connect {0}:{1} is error!", ip, port));
+				Dbg.ERROR_MSG(string.Format("KBEngine::createAccount_loginapp(): connect {0}:{1} error!", ip, port));
 				return;
 			}
 			
-			Dbg.DEBUG_MSG(string.Format("KBEngine::createAccount_loginapp(): connect {0}:{1} is success!", ip, port)); 
+			Dbg.DEBUG_MSG(string.Format("KBEngine::createAccount_loginapp(): connect {0}:{1} success!", ip, port)); 
 			onOpenLoginapp_createAccount();
 		}
 		
@@ -780,10 +856,11 @@
 			var accountName = stream.readString();
 			username = accountName;
 			baseappIP = stream.readString();
-			baseappPort = stream.readUint16();
-			
+			baseappTcpPort = stream.readUint16();
+			baseappUdpPort = stream.readUint16();
+
 			Dbg.DEBUG_MSG("KBEngine::Client_onLoginSuccessfully: accountName(" + accountName + "), addr(" + 
-					baseappIP + ":" + baseappPort + "), datas(" + _serverdatas.Length + ")!");
+					baseappIP + ":" + baseappTcpPort + "|" + baseappUdpPort + "), datas(" + _serverdatas.Length + ")!");
 			
 			_serverdatas = stream.readBlob();
 			login_baseapp(true);
@@ -953,7 +1030,7 @@
 				MemoryStream stream1 = MemoryStream.createObject();
 				stream1.wpos = stream.wpos;
 				stream1.rpos = stream.rpos - 4;
-				Array.Copy(stream.data(), stream1.data(), stream.data().Length);
+				Array.Copy(stream.data(), stream1.data(), stream.wpos);
 				_bufferedCreateEntityMessages[eid] = stream1;
 				return;
 			}
@@ -1231,11 +1308,11 @@
 		}
 
 		/*
-			更新当前玩家的位置与朝向到服务端， 可以通过开关_syncPlayer关闭这个机制
+			更新当前玩家的位置与朝向到服务端， 可以通过开关_syncPlayerMS关闭这个机制
 		*/
 		public void updatePlayerToServer()
 		{
-			if(!_args.syncPlayer || spaceID == 0)
+			if(_updatePlayerToServerPeroid <= 0.01f || spaceID == 0)
 			{
 				return;
 			}
@@ -1243,14 +1320,14 @@
 			var now = DateTime.Now;
 			TimeSpan span = now - _lastUpdateToServerTime;
 
-			if (span.Ticks < 1000000)
-				return;
+			if (span.Ticks < _updatePlayerToServerPeroid * _1MS_TO_100NS)
+                return;
 			
 			Entity playerEntity = player();
 			if (playerEntity == null || playerEntity.inWorld == false || playerEntity.isControlled)
 				return;
 
-			_lastUpdateToServerTime = now - (span - TimeSpan.FromTicks(1000000));
+			_lastUpdateToServerTime = now - (span - TimeSpan.FromTicks(Convert.ToInt64(_updatePlayerToServerPeroid * _1MS_TO_100NS)));
 			
 			Vector3 position = playerEntity.position;
 			Vector3 direction = playerEntity.direction;
@@ -2021,7 +2098,7 @@
 		{
 			TimeSpan span = DateTime.Now - _lasttime; 
 			
-			int diff = (int)(threadUpdatePeriod - span.Milliseconds);
+			int diff = (int)(threadUpdatePeriod - span.TotalMilliseconds);
 
 			if(diff < 0)
 				diff = 0;

@@ -144,8 +144,9 @@ typedef struct EngineComponentInfo
 	float defaultViewRadius;								// 配置在cellapp节点中的player的view半径大小
 	float defaultViewHysteresisArea;						// 配置在cellapp节点中的player的view的滞后范围
 	uint16 witness_timeout;									// 观察者默认超时时间(秒)
-	const Network::Address* externalAddr;					// 外部地址
-	const Network::Address* internalAddr;					// 内部地址
+	const Network::Address* externalTcpAddr;				// 外部地址
+	const Network::Address* externalUdpAddr;				// 外部地址
+	const Network::Address* internalTcpAddr;				// 内部地址
 	COMPONENT_ID componentID;
 
 	float ghostDistance;									// ghost区域距离
@@ -162,8 +163,12 @@ typedef struct EngineComponentInfo
 	char internalInterface[MAX_NAME];						// 内部网卡接口名称
 	char externalInterface[MAX_NAME];						// 外部网卡接口名称
 	char externalAddress[MAX_NAME];							// 外部IP地址
-	int32 externalPorts_min;								// 对外socket端口使用指定范围
-	int32 externalPorts_max;
+
+	int32 externalTcpPorts_min;								// 对外socket TCP端口使用指定范围
+	int32 externalTcpPorts_max;
+
+	int32 externalUdpPorts_min;								// 对外socket UDP端口使用指定范围
+	int32 externalUdpPorts_max;
 
 	std::vector<DBInterfaceInfo> dbInterfaceInfos;			// 数据库接口
 	bool notFoundAccountAutoCreate;							// 登录合法时游戏数据库找不到游戏账号则自动创建
@@ -248,12 +253,14 @@ public:
 	INLINE ENGINE_COMPONENT_INFO& getConfig();
 
  	void updateInfos(bool isPrint, COMPONENT_TYPE componentType, COMPONENT_ID componentID, 
- 				const Network::Address& internalAddr, const Network::Address& externalAddr);
+ 				const Network::Address& internalTcpAddr, const Network::Address& externalTcpAddr, const Network::Address& externalUdpAddr);
  	
 	void updateExternalAddress(char* buf);
 
 	INLINE int16 gameUpdateHertz(void) const;
-	INLINE Network::Address interfacesAddr(void) const;
+
+	Network::Address interfacesAddr(void) const;
+	INLINE std::vector< Network::Address > interfacesAddrs(void) const;
 
 	const ChannelCommon& channelCommon(){ return channelCommon_; }
 
@@ -265,6 +272,7 @@ public:
 	uint32 tickMaxBufferedLogs() const { return tick_max_buffered_logs_; }
 	uint32 tickMaxSyncLogs() const { return tick_max_sync_logs_; }
 
+	INLINE float channelExternalTimeout(void) const;
 	INLINE bool IsPureDBInterfaceName(const std::string& dbInterfaceName);
 	INLINE DBInterfaceInfo* dbInterface(const std::string& name);
 	INLINE int dbInterfaceName2dbInterfaceIndex(const std::string& dbInterfaceName);
@@ -296,6 +304,7 @@ public:
 	uint32 bitsPerSecondToClient_;		
 
 	Network::Address interfacesAddr_;
+	std::vector< Network::Address > interfacesAddrs_;
 	uint32 interfaces_orders_timeout_;
 
 	float shutdown_time_;

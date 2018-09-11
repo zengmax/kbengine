@@ -25,6 +25,18 @@ namespace KBEngine {
 }																												\
 
 
+#define CALL_COMPONENTS_AND_ENTITY_METHOD(ENTITYOBJ, CALLCODE)													\
+{																												\
+	{																											\
+		CALL_ENTITY_COMPONENTS_METHOD(ENTITYOBJ, CALLCODE);														\
+		bool GETERR = false;																					\
+		Py_INCREF(ENTITYOBJ);																					\
+		PyObject* pyTempObj = ENTITYOBJ;																		\
+		CALLCODE;																								\
+		Py_DECREF(ENTITYOBJ);																					\
+	}																											\
+}																												\
+
 
 #define CALL_ENTITY_COMPONENTS_METHOD(ENTITYOBJ, CALLCODE)														\
 	{																											\
@@ -80,6 +92,7 @@ public:
 	DECLARE_PY_GET_MOTHOD(pyGetOwnerID);
 
 	PyObject* owner(bool attempt = false);
+	void updateOwner(ENTITY_ID id, PyObject* pOwner);
 
 	DECLARE_PY_GET_MOTHOD(pyIsDestroyed);
 
@@ -148,7 +161,8 @@ public:
 
 	bool isSamePersistentType(PyObject* pyValue);
 	void addPersistentToStream(MemoryStream* mstream, PyObject* pyValue);
-	PyObject* createFromPersistentStream(MemoryStream* mstream);
+	void addPersistentToStreamTemplates(ScriptDefModule* pScriptModule, MemoryStream* mstream);
+	PyObject* createFromPersistentStream(ScriptDefModule* pScriptModule, MemoryStream* mstream);
 
 	PropertyDescription* getProperty(ENTITY_PROPERTY_UID child_uid);
 	
@@ -182,10 +196,10 @@ public:
 
 	PyObject* createCellData();
 
-	void createFromDict(PyObject* pyDict);
-	void updateFromDict(PyObject* pyDict);
+	void createFromDict(PyObject* pyDict, bool persistentData);
+	void updateFromDict(PyObject* pOwner, PyObject* pyDict);
 
-	static void convertDictDataToEntityComponent(ENTITY_ID entityID, ScriptDefModule* pEntityScriptDescrs, PyObject* cellData);
+	static void convertDictDataToEntityComponent(ENTITY_ID entityID, PyObject* pEntity, ScriptDefModule* pEntityScriptDescrs, PyObject* cellData, bool persistentData);
 	static std::vector<EntityComponent*> getComponents(const std::string& name, PyObject* pEntity, ScriptDefModule* pEntityScriptDescrs);
 
 	/**

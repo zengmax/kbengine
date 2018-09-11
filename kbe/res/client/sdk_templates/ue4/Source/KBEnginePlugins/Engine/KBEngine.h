@@ -8,7 +8,7 @@
 
 class KBEngineArgs;
 class Entity;
-class NetworkInterface;
+class NetworkInterfaceBase;
 class MemoryStream;
 
 /*
@@ -38,7 +38,7 @@ public:
 	void destroy();
 	void reset();
 
-	NetworkInterface* pNetworkInterface() const {
+	NetworkInterfaceBase* pNetworkInterface() const {
 		return pNetworkInterface_;
 	}
 
@@ -112,6 +112,11 @@ public:
 	*/
 	bool login(const FString& username, const FString& password, const TArray<uint8>& datas);
 	virtual void onConnectCallback(FString ip, uint16 port, bool success, int userdata) override;
+
+	/**
+		登录出baseapp
+	*/
+	bool logout();
 
 	/*
 		账号创建返回结果
@@ -407,14 +412,15 @@ public:
 
 protected:
 	KBEngineArgs* pArgs_;
-	NetworkInterface* pNetworkInterface_;
+	NetworkInterfaceBase* pNetworkInterface_;
 
 	FString username_;
 	FString password_;
 
 	// 服务端分配的baseapp地址
 	FString baseappIP_;
-	uint16 baseappPort_;
+	uint16 baseappTcpPort_;
+	uint16 baseappUdpPort_;
 
 	// 当前状态
 	FString currserver_;

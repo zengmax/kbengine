@@ -6,12 +6,15 @@ KBEngineArgs::KBEngineArgs():
 	ip(TEXT("127.0.0.1")),
 	port(20013),
 	clientType(EKCLIENT_TYPE::CLIENT_TYPE_WIN),
-	syncPlayer(true),
+	syncPlayerMS(100),
 	useAliasEntityID(true),
 	isOnInitCallPropertysSetMethods(true),
+	forceDisableUDP(false),
 	serverHeartbeatTick(15),
-	SEND_BUFFER_MAX(TCP_PACKET_MAX),
-	RECV_BUFFER_MAX(TCP_PACKET_MAX)
+	TCP_SEND_BUFFER_MAX(TCP_PACKET_MAX),
+	UDP_SEND_BUFFER_MAX(128),
+	TCP_RECV_BUFFER_MAX(TCP_PACKET_MAX),
+	UDP_RECV_BUFFER_MAX(128)
 {
 }
 
@@ -19,12 +22,22 @@ KBEngineArgs::~KBEngineArgs()
 {
 }
 
-int KBEngineArgs::getRecvBufferSize()
+int KBEngineArgs::getTCPRecvBufferSize()
 {
-	return (int)RECV_BUFFER_MAX;
+	return (int)TCP_RECV_BUFFER_MAX;
 }
 
-int KBEngineArgs::getSendBufferSize()
+int KBEngineArgs::getTCPSendBufferSize()
 {
-	return (int)SEND_BUFFER_MAX;
+	return (int)TCP_SEND_BUFFER_MAX;
+}
+
+int KBEngineArgs::getUDPRecvBufferSize()
+{
+	return (int)UDP_RECV_BUFFER_MAX;
+}
+
+int KBEngineArgs::getUDPSendBufferSize()
+{
+	return (int)UDP_SEND_BUFFER_MAX;
 }

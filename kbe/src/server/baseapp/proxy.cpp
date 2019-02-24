@@ -175,7 +175,7 @@ void Proxy::onClientEnabled(void)
 {
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 	clientEnabled_ = true;
-	CALL_ENTITY_AND_COMPONENTS_METHOD(this, SCRIPT_OBJECT_CALL_ARGS0(pyTempObj, const_cast<char*>("onClientEnabled"), GETERR));
+	CALL_COMPONENTS_AND_ENTITY_METHOD(this, SCRIPT_OBJECT_CALL_ARGS0(pyTempObj, const_cast<char*>("onClientEnabled"), GETERR));
 }
 
 //-------------------------------------------------------------------------------------
@@ -587,7 +587,7 @@ PyObject* Proxy::__py_pyStreamFileToClient(PyObject* self, PyObject* args)
 	{
 		if(PyArg_ParseTuple(args, "O", &pyResourceName) == -1)
 		{
-			PyErr_Format(PyExc_TypeError, "Proxy::streamFileToClient: args is error!");
+			PyErr_Format(PyExc_TypeError, "Proxy::streamFileToClient: args error!");
 			PyErr_PrintEx(0);
 			return NULL;
 		}
@@ -596,7 +596,7 @@ PyObject* Proxy::__py_pyStreamFileToClient(PyObject* self, PyObject* args)
 	{
 		if(PyArg_ParseTuple(args, "O|O", &pyResourceName, &pyDesc) == -1)
 		{
-			PyErr_Format(PyExc_TypeError, "Proxy::streamFileToClient: args is error!");
+			PyErr_Format(PyExc_TypeError, "Proxy::streamFileToClient: args error!");
 			PyErr_PrintEx(0);
 			return NULL;
 		}
@@ -605,19 +605,17 @@ PyObject* Proxy::__py_pyStreamFileToClient(PyObject* self, PyObject* args)
 	{
 		if(PyArg_ParseTuple(args, "O|O|H", &pyResourceName, &pyDesc, &id) == -1)
 		{
-			PyErr_Format(PyExc_TypeError, "Proxy::streamFileToClient: args is error!");
+			PyErr_Format(PyExc_TypeError, "Proxy::streamFileToClient: args error!");
 			PyErr_PrintEx(0);
 			return NULL;
 		}
 	}
 
-	char* pDescr = NULL;
+	const char* pDescr = NULL;
 
 	if (pyDesc)
 	{
-		wchar_t* PyUnicode_AsWideCharStringRet1 = PyUnicode_AsWideCharString(pyDesc, NULL);
-		pDescr = strutil::wchar2char(PyUnicode_AsWideCharStringRet1);
-		PyMem_Free(PyUnicode_AsWideCharStringRet1);
+		pDescr = PyUnicode_AsUTF8AndSize(pyDesc, NULL);
 	}
 
 	if(pDescr && strlen(pDescr) > 255)
@@ -626,16 +624,12 @@ PyObject* Proxy::__py_pyStreamFileToClient(PyObject* self, PyObject* args)
 			strlen(pDescr));
 
 		PyErr_PrintEx(0);
-		free(pDescr);
 		return NULL;
 	}
 
 	int16 rid = pobj->streamFileToClient(pyResourceName, 
 							(pDescr == NULL ? "" : pDescr),  
 							id);
-
-	if(pDescr)
-		free(pDescr);
 
 	return PyLong_FromLong(rid);
 }
@@ -682,7 +676,7 @@ PyObject* Proxy::__py_pyStreamStringToClient(PyObject* self, PyObject* args)
 	{
 		if(PyArg_ParseTuple(args, "O", &pyData) == -1)
 		{
-			PyErr_Format(PyExc_TypeError, "Proxy::streamStringToClient: args is error!");
+			PyErr_Format(PyExc_TypeError, "Proxy::streamStringToClient: args error!");
 			PyErr_PrintEx(0);
 			return NULL;
 		}
@@ -691,7 +685,7 @@ PyObject* Proxy::__py_pyStreamStringToClient(PyObject* self, PyObject* args)
 	{
 		if(PyArg_ParseTuple(args, "O|O", &pyData, &pyDesc) == -1)
 		{
-			PyErr_Format(PyExc_TypeError, "Proxy::streamStringToClient: args is error!");
+			PyErr_Format(PyExc_TypeError, "Proxy::streamStringToClient: args error!");
 			PyErr_PrintEx(0);
 			return NULL;
 		}
@@ -700,19 +694,17 @@ PyObject* Proxy::__py_pyStreamStringToClient(PyObject* self, PyObject* args)
 	{
 		if(PyArg_ParseTuple(args, "O|O|H", &pyData, &pyDesc, &id) == -1)
 		{
-			PyErr_Format(PyExc_TypeError, "Proxy::streamStringToClient: args is error!");
+			PyErr_Format(PyExc_TypeError, "Proxy::streamStringToClient: args error!");
 			PyErr_PrintEx(0);
 			return NULL;
 		}
 	}
 
-	char* pDescr = NULL;
+	const char* pDescr = NULL;
 
 	if (pyDesc)
 	{
-		wchar_t* PyUnicode_AsWideCharStringRet1 = PyUnicode_AsWideCharString(pyDesc, NULL);
-		pDescr = strutil::wchar2char(PyUnicode_AsWideCharStringRet1);
-		PyMem_Free(PyUnicode_AsWideCharStringRet1);
+		pDescr = PyUnicode_AsUTF8AndSize(pyDesc, NULL);
 	}
 
 	if(pDescr && strlen(pDescr) > 255)
@@ -721,7 +713,6 @@ PyObject* Proxy::__py_pyStreamStringToClient(PyObject* self, PyObject* args)
 			strlen(pDescr));
 
 		PyErr_PrintEx(0);
-		free(pDescr);
 		return NULL;
 	}
 
@@ -729,8 +720,10 @@ PyObject* Proxy::__py_pyStreamStringToClient(PyObject* self, PyObject* args)
 						(pDescr == NULL ? "" : pDescr),  
 						id);
 
-	if(pDescr)
-		free(pDescr);
+	if (rid != id)
+	{
+		WARNING_MSG(fmt::format("Proxy::streamFileToClient: the id({}) has been used, a new id({}) is assigned!\n", id, rid));
+	}
 
 	return PyLong_FromLong(rid);
 }

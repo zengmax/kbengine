@@ -8,8 +8,8 @@
 namespace KBEngine{
 	
 #define KBE_VERSION_MAJOR 2
-#define KBE_VERSION_MINOR 2
-#define KBE_VERSION_PATCH 6
+#define KBE_VERSION_MINOR 4
+#define KBE_VERSION_PATCH 2
 
 
 namespace KBEVersion

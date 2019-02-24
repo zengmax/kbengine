@@ -23,6 +23,7 @@
 #include "network/message_handler.h"
 #include "network/network_stats.h"
 #include "helper/profile.h"
+#include "common/ssl.h"
 
 namespace KBEngine { 
 namespace Network
@@ -278,7 +279,7 @@ bool Channel::initialize(NetworkInterface & networkInterface,
 
 	startInactivityDetection((traits_ == INTERNAL) ? g_channelInternalTimeout : 
 													g_channelExternalTimeout,
-							(traits_ == INTERNAL) ? g_channelInternalTimeout  / 2.f: 
+							(traits_ == INTERNAL) ? g_channelInternalTimeout / 2.f: 
 													g_channelExternalTimeout / 2.f);
 
 	return true;
@@ -486,15 +487,23 @@ void Channel::startInactivityDetection( float period, float checkPeriod )
 	stopInactivityDetection();
 
 	// 如果周期为负数则不检查
-	if(period > 0.001f)
+	if (period > 0.001f)
 	{
 		checkPeriod = std::max(1.f, checkPeriod);
-		inactivityExceptionPeriod_ = uint64( period * stampsPerSecond() ) - uint64( 0.05f * stampsPerSecond() );
+
+		int icheckPeriod = int(checkPeriod * 1000000);
+		if (icheckPeriod <= 0)
+		{
+			ERROR_MSG(fmt::format("Channel::startInactivityDetection: checkPeriod overflowed, close checker! period={}, checkPeriod={}\n", period, checkPeriod));
+			return;
+		}
+
+		inactivityExceptionPeriod_ = uint64(period * stampsPerSecond()) - uint64(0.05f * stampsPerSecond());
 		lastReceivedTime_ = timestamp();
 
 		inactivityTimerHandle_ =
-			this->dispatcher().addTimer( int( checkPeriod * 1000000 ),
-										this, (void *)TIMEOUT_INACTIVITY_CHECK );
+			this->dispatcher().addTimer(icheckPeriod,
+				this, (void *)TIMEOUT_INACTIVITY_CHECK);
 	}
 }
 
@@ -579,6 +588,7 @@ void Channel::clearState( bool warnOnDiscard /*=false*/ )
 	// 由于pEndPoint通常由外部给入，必须释放，频道重新激活时会重新赋值
 	if(pEndPoint_)
 	{
+		pEndPoint_->destroySSL();
 		pEndPoint_->close();
 		this->pEndPoint(NULL);
 	}
@@ -1031,6 +1041,26 @@ bool Channel::handshake(Packet* pPacket)
 
 	if (protocoltype_ == PROTOCOL_TCP)
 	{
+		// https/wss
+		if (!pEndPoint_->isSSL())
+		{
+			int sslVersion = KB_SSL::isSSLProtocal(pPacket);
+			if (sslVersion != -1)
+			{
+				// 无论成功和失败都返回true，让外部回收数据包并继续等待握手
+				pEndPoint_->setupSSL(sslVersion, pPacket);
+
+				if (pPacket->length() == 0)
+					return true;
+			}
+		}
+		else
+		{
+			// 如果开启了ssl通讯，因目前只支持wss，所以必须等待websocket握手成功才算通过
+			if (!websocket::WebSocketProtocol::isWebSocketProtocol(pPacket))
+				return true;
+		}
+
 		flags_ |= FLAG_HANDSHAKE;
 
 		// 此处判定是否为websocket或者其他协议的握手

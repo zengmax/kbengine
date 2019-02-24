@@ -81,7 +81,7 @@ int HTTPCBHandler::handleInputNotification(int fd)
 
 		if(newclient == NULL)
 		{
-			ERROR_MSG(fmt::format("HTTPCBHandler::handleInputNotification: accept is error:{}.\n", kbe_strerror()));
+			ERROR_MSG(fmt::format("HTTPCBHandler::handleInputNotification: accept error:{}.\n", kbe_strerror()));
 			return 0;
 		}
 
@@ -262,8 +262,8 @@ int HTTPCBHandler::handleInputNotification(int fd)
 						}
 					}
 
-					username = HttpUtility::URLDecode(username);
-					password = HttpUtility::URLDecode(password);
+					username = Network::Http::URLDecode(username);
+					password = Network::Http::URLDecode(password);
 
 					// ÏòdbmgrÖØÖÃÕËºÅ
 					Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
@@ -294,7 +294,7 @@ int HTTPCBHandler::handleInputNotification(int fd)
 
 				if(username.size() > 0)
 				{
-					username = HttpUtility::URLDecode(username);
+					username = Network::Http::URLDecode(username);
 
 					// Ïòdbmgr°ó¶¨ÕËºÅÕËºÅ
 					Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
@@ -310,7 +310,9 @@ int HTTPCBHandler::handleInputNotification(int fd)
 			if(hellomessage.size() > 0 && client.state < 2)
 			{
 				KBEngine::strutil::kbe_replace(hellomessage, "${backlink}", fmt::format("http://{}:{}/{}{}", 
-					Loginapp::getSingleton().networkInterface().extTcpAddr().ipAsString(),
+					(strlen((const char*)&g_kbeSrvConfig.getLoginApp().externalAddress) > 0 ? 
+					g_kbeSrvConfig.getLoginApp().externalAddress : 
+					Loginapp::getSingleton().networkInterface().extTcpAddr().ipAsString()),
 					g_kbeSrvConfig.getLoginApp().http_cbport,
 					keys,
 					code));

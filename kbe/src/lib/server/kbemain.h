@@ -6,6 +6,7 @@
 #include "helper/memory_helper.h"
 
 #include "serverapp.h"
+#include "Python.h"
 #include "common/common.h"
 #include "common/kbekey.h"
 #include "common/stringconv.h"
@@ -30,13 +31,14 @@ inline void START_MSG(const char * name, uint64 appuid)
 	std::string s = (fmt::format("---- {} "
 			"Version: {}. "
 			"ScriptVersion: {}. "
+			"Pythoncore: {}. "
 			"Protocol: {}. "
 			"Config: {} {}. "
 			"Built: {} {}. "
 			"AppID: {}. "
 			"UID: {}. "
 			"PID: {} ----\n",
-		name, KBEVersion::versionString(), KBEVersion::scriptVersionString(),
+		name, KBEVersion::versionString(), KBEVersion::scriptVersionString(), PY_VERSION,
 		Network::MessageHandlers::getDigestStr(),
 		KBE_CONFIG, KBE_ARCH, __TIME__, __DATE__,
 		appuid, getUserUID(), getProcessPID()));
@@ -323,7 +325,7 @@ int main(int argc, char* argv[])																						\
 	g_componentID = genUUID64();																						\
 	parseMainCommandArgs(argc, argv);																					\
 	char dumpname[MAX_BUF] = {0};																						\
-	kbe_snprintf(dumpname, MAX_BUF, "%"PRAppID, g_componentID);															\
+	kbe_snprintf(dumpname, MAX_BUF, "%" PRAppID, g_componentID);														\
 	KBEngine::exception::installCrashHandler(1, dumpname);																\
 	int retcode = -1;																									\
 	THREAD_TRY_EXECUTION;																								\

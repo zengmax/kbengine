@@ -22,6 +22,7 @@
 #include "dbmgr/dbmgr_interface.h"
 #include "navigation/navigation.h"
 #include "client_lib/client_interface.h"
+#include "common/sha1.h"
 
 #include "../../server/baseappmgr/baseappmgr_interface.h"
 #include "../../server/cellappmgr/cellappmgr_interface.h"
@@ -68,7 +69,7 @@ Cellapp::~Cellapp()
 }
 
 //-------------------------------------------------------------------------------------	
-bool Cellapp::canShutdown()
+ShutdownHandler::CAN_SHUTDOWN_STATE Cellapp::canShutdown()
 {
 	Entities<Entity>::ENTITYS_MAP& entities =  this->pEntities()->getEntities();
 	Entities<Entity>::ENTITYS_MAP::iterator iter = entities.begin();
@@ -78,12 +79,15 @@ bool Cellapp::canShutdown()
 		//if(pEntity->baseEntityCall() != NULL && 
 		//		pEntity->pScriptModule()->isPersistent())
 		{
+			INFO_MSG(fmt::format("Cellapp::canShutdown(): Wait for the entity's into the database! The remaining {}.\n",
+				entities.size()));
+
 			lastShutdownFailReason_ = "destroyHasBaseEntitys";
-			return false;
+			return ShutdownHandler::CAN_SHUTDOWN_STATE_FALSE;
 		}
 	}
 
-	return true;
+	return ShutdownHandler::CAN_SHUTDOWN_STATE_TRUE;
 }
 
 //-------------------------------------------------------------------------------------	
@@ -451,7 +455,7 @@ PyObject* Cellapp::__py_createEntity(PyObject* self, PyObject* args)
 	if(!PyArg_ParseTuple(args, "s|I|O|O|O", &entityType, &spaceID, &position, &direction, &params))
 	{
 		PyErr_Format(PyExc_TypeError, 
-			"KBEngine::createEntity: args is error! args[scriptName, spaceID, position, direction, states].");
+			"KBEngine::createEntity: args error! args[scriptName, spaceID, position, direction, states].");
 		PyErr_PrintEx(0);
 		return 0;
 	}
@@ -529,7 +533,7 @@ PyObject* Cellapp::__py_executeRawDatabaseCommand(PyObject* self, PyObject* args
 
 	if(ret == -1)
 	{
-		PyErr_Format(PyExc_TypeError, "KBEngine::executeRawDatabaseCommand: args is error!");
+		PyErr_Format(PyExc_TypeError, "KBEngine::executeRawDatabaseCommand: args error!");
 		PyErr_PrintEx(0);
 		S_Return;
 	}
@@ -537,11 +541,7 @@ PyObject* Cellapp::__py_executeRawDatabaseCommand(PyObject* self, PyObject* args
 	std::string dbInterfaceName = "default";
 	if (pyDBInterfaceName)
 	{
-		wchar_t* PyUnicode_AsWideCharStringRet0 = PyUnicode_AsWideCharString(pyDBInterfaceName, NULL);
-		char* ccattr = strutil::wchar2char(PyUnicode_AsWideCharStringRet0);
-		dbInterfaceName = ccattr;
-		PyMem_Free(PyUnicode_AsWideCharStringRet0);
-		free(ccattr);
+		dbInterfaceName = PyUnicode_AsUTF8AndSize(pyDBInterfaceName, NULL);
 		
 		if (!g_kbeSrvConfig.dbInterface(dbInterfaceName))
 		{
@@ -562,7 +562,7 @@ void Cellapp::executeRawDatabaseCommand(const char* datas, uint32 size, PyObject
 {
 	if(datas == NULL)
 	{
-		ERROR_MSG("KBEngine::executeRawDatabaseCommand: execute is error!\n");
+		ERROR_MSG("KBEngine::executeRawDatabaseCommand: execute error!\n");
 		return;
 	}
 
@@ -721,7 +721,7 @@ void Cellapp::onExecuteRawDatabaseCommandCB(Network::Channel* pChannel, KBEngine
 		}
 		else
 		{
-			ERROR_MSG(fmt::format("Cellapp::onExecuteRawDatabaseCommandCB: can't found callback:{}.\n",
+			ERROR_MSG(fmt::format("Cellapp::onExecuteRawDatabaseCommandCB: not found callback:{}.\n",
 				callbackID));
 		}
 	}
@@ -936,6 +936,12 @@ void Cellapp::onCreateCellEntityInNewSpaceFromBaseapp(Network::Channel* pChannel
 			return;
 		}
 
+		KBE_SHA1 sha;
+		uint32 digest[5];
+		sha.Input(s.data(), s.length());
+		sha.Result(digest);
+		e->setDirty((uint32*)&digest[0]);
+
 		space->addEntity(e);
 		e->spaceID(space->id());
 		e->initializeEntity(cellData, true);
@@ -1034,6 +1040,12 @@ void Cellapp::onRestoreSpaceInCellFromBaseapp(Network::Channel* pChannel, KBEngi
 			return;
 		}
 		
+		KBE_SHA1 sha;
+		uint32 digest[5];
+		sha.Input(s.data(), s.length());
+		sha.Result(digest);
+		e->setDirty((uint32*)&digest[0]);
+
 		e->spaceID(space->id());
 		e->createNamespace(cellData);
 		Py_XDECREF(cellData);
@@ -1171,6 +1183,12 @@ void Cellapp::_onCreateCellEntityFromBaseapp(std::string& entityType, ENTITY_ID 
 		EntityCall* entityCall = new EntityCall(e->pScriptModule(), NULL, componentID, entityID, ENTITYCALL_TYPE_BASE);
 		e->baseEntityCall(entityCall);
 		
+		KBE_SHA1 sha;
+		uint32 digest[5];
+		sha.Input(pCellData->data(), pCellData->length());
+		sha.Result(digest);
+		e->setDirty((uint32*)&digest[0]);
+
 		cellData = e->createCellDataFromStream(pCellData);
 
 		e->createNamespace(cellData, true);
@@ -1225,13 +1243,39 @@ void Cellapp::_onCreateCellEntityFromBaseapp(std::string& entityType, ENTITY_ID 
 		return;
 	}
 
-	KBE_ASSERT(false && "Cellapp::onCreateCellEntityFromBaseapp: is error!\n");
+	KBE_ASSERT(false && "Cellapp::onCreateCellEntityFromBaseapp: error!\n");
 }
 
 //-------------------------------------------------------------------------------------
 void Cellapp::onDestroyCellEntityFromBaseapp(Network::Channel* pChannel, ENTITY_ID eid)
 {
 	// DEBUG_MSG("Cellapp::onDestroyCellEntityFromBaseapp:entityID=%d.\n", eid);
+
+	KBEngine::Entity* e = KBEngine::Cellapp::getSingleton().findEntity(eid);
+
+	if (e == NULL)
+	{
+		WARNING_MSG(fmt::format("Cellapp::onDestroyCellEntityFromBaseapp: not found entityID:{}.\n",
+			eid));
+
+		return;
+	}
+
+	if (!e->isReal())
+	{
+		// 需要做中转
+		GhostManager* gm = Cellapp::getSingleton().pGhostManager();
+		if (gm)
+		{
+			Network::Bundle* pBundle = gm->createSendBundle(e->realCell());
+			pBundle->newMessage(CellappInterface::onDestroyCellEntityFromBaseapp);
+			(*pBundle) << eid;
+			gm->pushMessage(e->realCell(), pBundle);
+		}
+
+		return;
+	}
+
 	destroyEntity(eid, true);
 }
 
@@ -1306,8 +1350,8 @@ void Cellapp::onEntityCall(Network::Channel* pChannel, KBEngine::MemoryStream& s
 				EntityCallAbstract* entityCall = static_cast<EntityCallAbstract*>(entity->baseEntityCall());
 				if(entityCall == NULL)
 				{
-					WARNING_MSG(fmt::format("Cellapp::onEntityCall: not found baseEntityCall! entitycallType={}, entityID={}.\n",
-						calltype, eid));
+					//WARNING_MSG(fmt::format("Cellapp::onEntityCall: not found baseEntityCall! entitycallType={}, entityID={}.\n",
+					//	calltype, eid));
 
 					break;
 				}
@@ -1329,8 +1373,8 @@ void Cellapp::onEntityCall(Network::Channel* pChannel, KBEngine::MemoryStream& s
 				EntityCallAbstract* entityCall = static_cast<EntityCallAbstract*>(entity->clientEntityCall());
 				if(entityCall == NULL)
 				{
-					WARNING_MSG(fmt::format("Cellapp::onEntityCall: not found clientEntityCall! entitycallType={}, entityID={}.\n",
-						calltype, eid));
+					//WARNING_MSG(fmt::format("Cellapp::onEntityCall: not found clientEntityCall! entitycallType={}, entityID={}.\n",
+					//	calltype, eid));
 
 					break;
 				}
@@ -1347,7 +1391,7 @@ void Cellapp::onEntityCall(Network::Channel* pChannel, KBEngine::MemoryStream& s
 			break;
 		default:
 			{
-				ERROR_MSG(fmt::format("Cellapp::onEntityCall: entitycallType {} is error! must a cellType. entityID={}.\n",
+				ERROR_MSG(fmt::format("Cellapp::onEntityCall: entitycallType {} error! must a cellType. entityID={}.\n",
 					calltype, eid));
 			}
 	};
@@ -1376,6 +1420,23 @@ void Cellapp::onRemoteCallMethodFromClient(Network::Channel* pChannel, KBEngine:
 	// 这个方法呼叫如果不是这个proxy自己的方法则必须呼叫的entity和proxy的cellEntity在一个space中。
 	try
 	{
+		if (!e->isReal())
+		{
+			// 需要做中转
+			GhostManager* gm = Cellapp::getSingleton().pGhostManager();
+			if (gm)
+			{
+				Network::Bundle* pBundle = gm->createSendBundle(e->realCell());
+				pBundle->newMessage(CellappInterface::onRemoteCallMethodFromClient);
+				(*pBundle) << srcEntityID;
+				(*pBundle) << targetID;
+				pBundle->append(s);
+				gm->pushMessage(e->realCell(), pBundle);
+			}
+
+			return;
+		}
+
 		e->onRemoteCallMethodFromClient(pChannel, srcEntityID, s);
 	}catch(MemoryStreamException &)
 	{
@@ -1608,6 +1669,22 @@ void Cellapp::forwardEntityMessageToCellappFromClient(Network::Channel* pChannel
 		return;
 	}
 
+	if (!e->isReal())
+	{
+		// 需要做中转
+		GhostManager* gm = Cellapp::getSingleton().pGhostManager();
+		if (gm)
+		{
+			Network::Bundle* pBundle = gm->createSendBundle(e->realCell());
+			pBundle->newMessage(CellappInterface::forwardEntityMessageToCellappFromClient);
+			(*pBundle) << srcEntityID;
+			pBundle->append(s);
+			gm->pushMessage(e->realCell(), pBundle);
+		}
+
+		return;
+	}
+
 	// 检查是否是entity消息， 否则不合法.
 	while(s.length() > 0 && !e->isDestroyed())
 	{
@@ -1702,7 +1779,7 @@ void Cellapp::lookApp(Network::Channel* pChannel)
 	if(pChannel->isExternal())
 		return;
 
-	DEBUG_MSG(fmt::format("Cellapp::lookApp: {}\n", pChannel->c_str()));
+	//DEBUG_MSG(fmt::format("Cellapp::lookApp: {}\n", pChannel->c_str()));
 
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	
@@ -1733,7 +1810,7 @@ PyObject* Cellapp::__py_reloadScript(PyObject* self, PyObject* args)
 	{
 		if(PyArg_ParseTuple(args, "b", &fullReload) == -1)
 		{
-			PyErr_Format(PyExc_TypeError, "KBEngine::reloadScript(fullReload): args is error!");
+			PyErr_Format(PyExc_TypeError, "KBEngine::reloadScript(fullReload): args error!");
 			PyErr_PrintEx(0);
 			return 0;
 		}
@@ -2053,7 +2130,7 @@ PyObject* Cellapp::__py_raycast(PyObject* self, PyObject* args)
 	{
 		if(PyArg_ParseTuple(args, "IOO", &spaceID, &pyStartPos, &pyEndPos) == -1)
 		{
-			PyErr_Format(PyExc_TypeError, "Cellapp::raycast: args is error!");
+			PyErr_Format(PyExc_TypeError, "Cellapp::raycast: args error!");
 			PyErr_PrintEx(0);
 			return 0;
 		}
@@ -2062,14 +2139,14 @@ PyObject* Cellapp::__py_raycast(PyObject* self, PyObject* args)
 	{
 		if(PyArg_ParseTuple(args, "IiOO", &spaceID, &layer, &pyStartPos, &pyEndPos) == -1)
 		{
-			PyErr_Format(PyExc_TypeError, "Cellapp::raycast: args is error!");
+			PyErr_Format(PyExc_TypeError, "Cellapp::raycast: args error!");
 			PyErr_PrintEx(0);
 			return 0;
 		}
 	}
 	else
 	{
-		PyErr_Format(PyExc_TypeError, "Cellapp::raycast: args is error!");
+		PyErr_Format(PyExc_TypeError, "Cellapp::raycast: args error!");
 		PyErr_PrintEx(0);
 		return 0;
 	}
@@ -2149,7 +2226,7 @@ PyObject* Cellapp::__py_setFlags(PyObject* self, PyObject* args)
 
 	if(PyArg_ParseTuple(args, "I", &flags) == -1)
 	{
-		PyErr_Format(PyExc_TypeError, "KBEngine::setFlags: args is error!");
+		PyErr_Format(PyExc_TypeError, "KBEngine::setFlags: args error!");
 		PyErr_PrintEx(0);
 		return NULL;
 	}

@@ -279,10 +279,10 @@ void CLogWindow::onReceiveRemoteLog(std::string str, bool fromServer)
 	if(fromServer)
 		m_logs_.push_back(str);
 
-	CString s;
-	wchar_t* wstr = KBEngine::strutil::char2wchar(str.c_str());
-	s = wstr;
-	free(wstr);
+	std::wstring wstr;
+	KBEngine::strutil::utf82wchar(str.c_str(), wstr);
+
+	CString s(wstr.c_str());
 	s.Replace(L"\n", L"");
 	s.Replace(L"\r\n", L"");
 	s.Replace(L"\n\r", L"");
@@ -371,7 +371,7 @@ void CLogWindow::pullLogs(KBEngine::Network::Address addr)
 	Network::Channel* pChannel = dlg->networkInterface().findChannel(addr);
 	if(pChannel == NULL)
 	{
-		::AfxMessageBox(L"logger is error!");
+		::AfxMessageBox(L"logger error!");
 		return;
 	}
 
@@ -667,7 +667,7 @@ void CLogWindow::updateSettingToServer()
 	Network::Channel* pChannel = dlg->networkInterface().findChannel(addr);
 	if(pChannel == NULL)
 	{
-		::AfxMessageBox(L"logger is error!");
+		::AfxMessageBox(L"logger error!");
 		Network::Bundle::reclaimPoolObject(pBundle);
 		return;
 	}

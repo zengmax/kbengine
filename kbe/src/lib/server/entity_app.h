@@ -369,64 +369,23 @@ int EntityApp<E>::unregisterPyObjectToScript(const char* attrName)
 template<class E>
 bool EntityApp<E>::installPyScript()
 {
-	if(Resmgr::getSingleton().respaths().size() <= 0 || 
-		Resmgr::getSingleton().getPyUserResPath().size() == 0 || 
+	if (Resmgr::getSingleton().respaths().size() <= 0 ||
+		Resmgr::getSingleton().getPyUserResPath().size() == 0 ||
 		Resmgr::getSingleton().getPySysResPath().size() == 0 ||
 		Resmgr::getSingleton().getPyUserScriptsPath().size() == 0)
 	{
-		KBE_ASSERT(false && "EntityApp::installPyScript: KBE_RES_PATH is error!\n");
+		KBE_ASSERT(false && "EntityApp::installPyScript: KBE_RES_PATH error!\n");
 		return false;
 	}
 
-	std::wstring user_scripts_path = L"";
-	wchar_t* tbuf = KBEngine::strutil::char2wchar(const_cast<char*>(Resmgr::getSingleton().getPyUserScriptsPath().c_str()));
-	if(tbuf != NULL)
-	{
-		user_scripts_path += tbuf;
-		free(tbuf);
-	}
-	else
+	std::pair<std::wstring, std::wstring> pyPaths = getComponentPythonPaths(g_componentType);
+	if (pyPaths.first.size() == 0)
 	{
 		KBE_ASSERT(false && "EntityApp::installPyScript: KBE_RES_PATH error[char2wchar]!\n");
 		return false;
 	}
 
-	std::wstring pyPaths = user_scripts_path + L"common;";
-	pyPaths += user_scripts_path + L"data;";
-	pyPaths += user_scripts_path + L"user_type;";
-
-	switch(componentType_)
-	{
-	case BASEAPP_TYPE:
-		pyPaths += user_scripts_path + L"server_common;";
-		pyPaths += user_scripts_path + L"base;";
-		pyPaths += user_scripts_path + L"base/interfaces;";
-		pyPaths += user_scripts_path + L"base/components;";
-		break;
-	case CELLAPP_TYPE:
-		pyPaths += user_scripts_path + L"server_common;";
-		pyPaths += user_scripts_path + L"cell;";
-		pyPaths += user_scripts_path + L"cell/interfaces;";
-		pyPaths += user_scripts_path + L"cell/components;";
-		break;
-	case DBMGR_TYPE:
-		pyPaths += user_scripts_path + L"server_common;";
-		pyPaths += user_scripts_path + L"db;";
-		break;
-	default:
-		pyPaths += user_scripts_path + L"client;";
-		pyPaths += user_scripts_path + L"client/interfaces;";
-		pyPaths += user_scripts_path + L"client/components;";
-		break;
-	};
-	
-	std::string kbe_res_path = Resmgr::getSingleton().getPySysResPath();
-	kbe_res_path += "scripts/common";
-
-	tbuf = KBEngine::strutil::char2wchar(const_cast<char*>(kbe_res_path.c_str()));
-	bool ret = getScript().install(tbuf, pyPaths, "KBEngine", componentType_);
-	free(tbuf);
-	return ret;
+	return getScript().install(pyPaths.first.c_str(), pyPaths.second, "KBEngine", componentType_);
 }
 
 template<class E>
@@ -800,7 +759,7 @@ PyObject* EntityApp<E>::__py_getWatcher(PyObject* self, PyObject* args)
 	int argCount = (int)PyTuple_Size(args);
 	if(argCount != 1)
 	{
-		PyErr_Format(PyExc_TypeError, "KBEngine::getWatcher(): args[strpath] is error!");
+		PyErr_Format(PyExc_TypeError, "KBEngine::getWatcher(): args[strpath] error!");
 		PyErr_PrintEx(0);
 		return 0;
 	}
@@ -809,7 +768,7 @@ PyObject* EntityApp<E>::__py_getWatcher(PyObject* self, PyObject* args)
 
 	if(PyArg_ParseTuple(args, "s", &path) == -1)
 	{
-		PyErr_Format(PyExc_TypeError, "KBEngine::getWatcher(): args[strpath] is error!");
+		PyErr_Format(PyExc_TypeError, "KBEngine::getWatcher(): args[strpath] error!");
 		PyErr_PrintEx(0);
 		return 0;
 	}
@@ -939,7 +898,7 @@ PyObject* EntityApp<E>::__py_getWatcherDir(PyObject* self, PyObject* args)
 	int argCount = (int)PyTuple_Size(args);
 	if(argCount != 1)
 	{
-		PyErr_Format(PyExc_TypeError, "KBEngine::getWatcherDir(): args[strpath] is error!");
+		PyErr_Format(PyExc_TypeError, "KBEngine::getWatcherDir(): args[strpath] error!");
 		PyErr_PrintEx(0);
 		return 0;
 	}
@@ -948,7 +907,7 @@ PyObject* EntityApp<E>::__py_getWatcherDir(PyObject* self, PyObject* args)
 
 	if(PyArg_ParseTuple(args, "s", &path) == -1)
 	{
-		PyErr_Format(PyExc_TypeError, "KBEngine::getWatcherDir(): args[strpath] is error!");
+		PyErr_Format(PyExc_TypeError, "KBEngine::getWatcherDir(): args[strpath] error!");
 		PyErr_PrintEx(0);
 		return 0;
 	}
@@ -973,7 +932,7 @@ PyObject* EntityApp<E>::__py_setScriptLogType(PyObject* self, PyObject* args)
 	int argCount = (int)PyTuple_Size(args);
 	if(argCount != 1)
 	{
-		PyErr_Format(PyExc_TypeError, "KBEngine::scriptLogType(): args is error!");
+		PyErr_Format(PyExc_TypeError, "KBEngine::scriptLogType(): args error!");
 		PyErr_PrintEx(0);
 		return 0;
 	}
@@ -982,7 +941,7 @@ PyObject* EntityApp<E>::__py_setScriptLogType(PyObject* self, PyObject* args)
 
 	if(PyArg_ParseTuple(args, "i", &type) == -1)
 	{
-		PyErr_Format(PyExc_TypeError, "KBEngine::scriptLogType(): args is error!");
+		PyErr_Format(PyExc_TypeError, "KBEngine::scriptLogType(): args error!");
 		PyErr_PrintEx(0);
 		return 0;
 	}
@@ -997,7 +956,7 @@ PyObject* EntityApp<E>::__py_getResFullPath(PyObject* self, PyObject* args)
 	int argCount = (int)PyTuple_Size(args);
 	if(argCount != 1)
 	{
-		PyErr_Format(PyExc_TypeError, "KBEngine::getResFullPath(): args is error!");
+		PyErr_Format(PyExc_TypeError, "KBEngine::getResFullPath(): args error!");
 		PyErr_PrintEx(0);
 		return 0;
 	}
@@ -1006,7 +965,7 @@ PyObject* EntityApp<E>::__py_getResFullPath(PyObject* self, PyObject* args)
 
 	if(PyArg_ParseTuple(args, "s", &respath) == -1)
 	{
-		PyErr_Format(PyExc_TypeError, "KBEngine::getResFullPath(): args is error!");
+		PyErr_Format(PyExc_TypeError, "KBEngine::getResFullPath(): args error!");
 		PyErr_PrintEx(0);
 		return 0;
 	}
@@ -1024,7 +983,7 @@ PyObject* EntityApp<E>::__py_hasRes(PyObject* self, PyObject* args)
 	int argCount = (int)PyTuple_Size(args);
 	if(argCount != 1)
 	{
-		PyErr_Format(PyExc_TypeError, "KBEngine::hasRes(): args is error!");
+		PyErr_Format(PyExc_TypeError, "KBEngine::hasRes(): args error!");
 		PyErr_PrintEx(0);
 		return 0;
 	}
@@ -1033,7 +992,7 @@ PyObject* EntityApp<E>::__py_hasRes(PyObject* self, PyObject* args)
 
 	if(PyArg_ParseTuple(args, "s", &respath) == -1)
 	{
-		PyErr_Format(PyExc_TypeError, "KBEngine::hasRes(): args is error!");
+		PyErr_Format(PyExc_TypeError, "KBEngine::hasRes(): args error!");
 		PyErr_PrintEx(0);
 		return 0;
 	}
@@ -1045,19 +1004,20 @@ template<class E>
 PyObject* EntityApp<E>::__py_kbeOpen(PyObject* self, PyObject* args)
 {
 	int argCount = (int)PyTuple_Size(args);
-	if(argCount != 2)
+	if (argCount < 1)
 	{
-		PyErr_Format(PyExc_TypeError, "KBEngine::open(): args is error!");
+		PyErr_Format(PyExc_TypeError, "KBEngine::open(): args error!");
 		PyErr_PrintEx(0);
 		return 0;
 	}
 
 	char* respath = NULL;
 	char* fargs = NULL;
+	char* encodingArg = NULL;
 
-	if(PyArg_ParseTuple(args, "s|s", &respath, &fargs) == -1)
+	if (PyArg_ParseTuple(args, "s|ss", &respath, &fargs, &encodingArg) == -1)
 	{
-		PyErr_Format(PyExc_TypeError, "KBEngine::open(): args is error!");
+		PyErr_Format(PyExc_TypeError, "KBEngine::open(): args error!");
 		PyErr_PrintEx(0);
 		return 0;
 	}
@@ -1067,14 +1027,26 @@ PyObject* EntityApp<E>::__py_kbeOpen(PyObject* self, PyObject* args)
 	PyObject *ioMod = PyImport_ImportModule("io");
 
 	// SCOPED_PROFILE(SCRIPTCALL_PROFILE);
-	PyObject *openedFile = PyObject_CallMethod(ioMod, const_cast<char*>("open"), 
-		const_cast<char*>("ss"), 
-		const_cast<char*>(sfullpath.c_str()), 
-		fargs);
+	PyObject *openedFile = NULL;
+	if (argCount > 1)
+	{
+		openedFile = PyObject_CallMethod(ioMod, const_cast<char*>("open"),
+			const_cast<char*>("ssis"),
+			const_cast<char*>(sfullpath.c_str()),
+			fargs,
+			-1,
+			encodingArg);
+	}
+	else
+	{
+		openedFile = PyObject_CallMethod(ioMod, const_cast<char*>("open"),
+			const_cast<char*>("s"),
+			const_cast<char*>(sfullpath.c_str()));
+	}
 
 	Py_DECREF(ioMod);
-	
-	if(openedFile == NULL)
+
+	if (openedFile == NULL)
 	{
 		SCRIPT_ERROR_CHECK();
 	}
@@ -1088,7 +1060,7 @@ PyObject* EntityApp<E>::__py_matchPath(PyObject* self, PyObject* args)
 	int argCount = (int)PyTuple_Size(args);
 	if(argCount != 1)
 	{
-		PyErr_Format(PyExc_TypeError, "KBEngine::matchPath(): args is error!");
+		PyErr_Format(PyExc_TypeError, "KBEngine::matchPath(): args error!");
 		PyErr_PrintEx(0);
 		return 0;
 	}
@@ -1097,7 +1069,7 @@ PyObject* EntityApp<E>::__py_matchPath(PyObject* self, PyObject* args)
 
 	if(PyArg_ParseTuple(args, "s", &respath) == -1)
 	{
-		PyErr_Format(PyExc_TypeError, "KBEngine::matchPath(): args is error!");
+		PyErr_Format(PyExc_TypeError, "KBEngine::matchPath(): args error!");
 		PyErr_PrintEx(0);
 		return 0;
 	}
@@ -1112,7 +1084,7 @@ PyObject* EntityApp<E>::__py_listPathRes(PyObject* self, PyObject* args)
 	int argCount = (int)PyTuple_Size(args);
 	if(argCount < 1 || argCount > 2)
 	{
-		PyErr_Format(PyExc_TypeError, "KBEngine::listPathRes(): args[path, pathargs=\'*.*\'] is error!");
+		PyErr_Format(PyExc_TypeError, "KBEngine::listPathRes(): args[path, pathargs=\'*.*\'] error!");
 		PyErr_PrintEx(0);
 		return 0;
 	}
@@ -1125,7 +1097,7 @@ PyObject* EntityApp<E>::__py_listPathRes(PyObject* self, PyObject* args)
 	{
 		if(PyArg_ParseTuple(args, "O", &pathobj) == -1)
 		{
-			PyErr_Format(PyExc_TypeError, "KBEngine::listPathRes(): args[path] is error!");
+			PyErr_Format(PyExc_TypeError, "KBEngine::listPathRes(): args[path] error!");
 			PyErr_PrintEx(0);
 			return 0;
 		}
@@ -1134,7 +1106,7 @@ PyObject* EntityApp<E>::__py_listPathRes(PyObject* self, PyObject* args)
 	{
 		if(PyArg_ParseTuple(args, "O|O", &pathobj, &path_argsobj) == -1)
 		{
-			PyErr_Format(PyExc_TypeError, "KBEngine::listPathRes(): args[path, pathargs=\'*.*\'] is error!");
+			PyErr_Format(PyExc_TypeError, "KBEngine::listPathRes(): args[path, pathargs=\'*.*\'] error!");
 			PyErr_PrintEx(0);
 			return 0;
 		}
@@ -1157,7 +1129,7 @@ PyObject* EntityApp<E>::__py_listPathRes(PyObject* self, PyObject* args)
 					PyObject* pyobj = PySequence_GetItem(path_argsobj, i);
 					if(!PyUnicode_Check(pyobj))
 					{
-						PyErr_Format(PyExc_TypeError, "KBEngine::listPathRes(): args[path, pathargs=\'*.*\'] is error!");
+						PyErr_Format(PyExc_TypeError, "KBEngine::listPathRes(): args[path, pathargs=\'*.*\'] error!");
 						PyErr_PrintEx(0);
 						return 0;
 					}
@@ -1171,7 +1143,7 @@ PyObject* EntityApp<E>::__py_listPathRes(PyObject* self, PyObject* args)
 			}
 			else
 			{
-				PyErr_Format(PyExc_TypeError, "KBEngine::listPathRes(): args[pathargs] is error!");
+				PyErr_Format(PyExc_TypeError, "KBEngine::listPathRes(): args[pathargs] error!");
 				PyErr_PrintEx(0);
 				return 0;
 			}
@@ -1180,7 +1152,7 @@ PyObject* EntityApp<E>::__py_listPathRes(PyObject* self, PyObject* args)
 
 	if(!PyUnicode_Check(pathobj))
 	{
-		PyErr_Format(PyExc_TypeError, "KBEngine::listPathRes(): args[path] is error!");
+		PyErr_Format(PyExc_TypeError, "KBEngine::listPathRes(): args[path] error!");
 		PyErr_PrintEx(0);
 		return 0;
 	}

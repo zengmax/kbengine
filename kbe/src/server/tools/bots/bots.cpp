@@ -94,7 +94,7 @@ bool Bots::initializeEnd()
 		g_kbeSrvConfig.getBots().telnet_deflayer, 
 		g_kbeSrvConfig.getBots().telnet_port))
 	{
-		ERROR_MSG("Bots::initialize: initializeEnd is error!\n");
+		ERROR_MSG("Bots::initialize: initializeEnd error!\n");
 		return false;
 	}
 
@@ -349,7 +349,7 @@ PyObject* Bots::__py_addBots(PyObject* self, PyObject* args)
 	{
 		if(PyArg_ParseTuple(args, "I", &reqCreateAndLoginTotalCount) == -1)
 		{
-			PyErr_Format(PyExc_TypeError, "KBEngine::addBots: args is error!");
+			PyErr_Format(PyExc_TypeError, "KBEngine::addBots: args error!");
 			PyErr_PrintEx(0);
 			return NULL;
 		}
@@ -362,7 +362,7 @@ PyObject* Bots::__py_addBots(PyObject* self, PyObject* args)
 		if(PyArg_ParseTuple(args, "I|I|f", &reqCreateAndLoginTotalCount, 
 			&reqCreateAndLoginTickCount, &reqCreateAndLoginTickTime) == -1)
 		{
-			PyErr_Format(PyExc_TypeError, "KBEngine::addBots: args is error!");
+			PyErr_Format(PyExc_TypeError, "KBEngine::addBots: args error!");
 			PyErr_PrintEx(0);
 			return NULL;
 		}
@@ -378,7 +378,7 @@ PyObject* Bots::__py_addBots(PyObject* self, PyObject* args)
 	}
 	else
 	{
-		PyErr_Format(PyExc_TypeError, "KBEngine::addBots: args is error!");
+		PyErr_Format(PyExc_TypeError, "KBEngine::addBots: args error!");
 		PyErr_PrintEx(0);
 		return NULL;
 	}
@@ -392,7 +392,7 @@ PyObject* Bots::__py_setScriptLogType(PyObject* self, PyObject* args)
 	int argCount = (int)PyTuple_Size(args);
 	if(argCount != 1)
 	{
-		PyErr_Format(PyExc_TypeError, "KBEngine::scriptLogType(): args is error!");
+		PyErr_Format(PyExc_TypeError, "KBEngine::scriptLogType(): args error!");
 		PyErr_PrintEx(0);
 		return 0;
 	}
@@ -401,7 +401,7 @@ PyObject* Bots::__py_setScriptLogType(PyObject* self, PyObject* args)
 
 	if(PyArg_ParseTuple(args, "i", &type) == -1)
 	{
-		PyErr_Format(PyExc_TypeError, "KBEngine::scriptLogType(): args is error!");
+		PyErr_Format(PyExc_TypeError, "KBEngine::scriptLogType(): args error!");
 		PyErr_PrintEx(0);
 	}
 
@@ -412,7 +412,7 @@ PyObject* Bots::__py_setScriptLogType(PyObject* self, PyObject* args)
 //-------------------------------------------------------------------------------------
 void Bots::lookApp(Network::Channel* pChannel)
 {
-	DEBUG_MSG(fmt::format("Bots::lookApp: {0}\n", pChannel->c_str()));
+	//DEBUG_MSG(fmt::format("Bots::lookApp: {0}\n", pChannel->c_str()));
 
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	
@@ -1061,6 +1061,236 @@ void Bots::onUpdateData_xyz_r(Network::Channel* pChannel, MemoryStream& s)
 	if(pClient)
 	{
 		pClient->onUpdateData_xyz_r(pChannel, s);
+	}
+}
+
+//-------------------------------------------------------------------------------------
+void Bots::onUpdateData_ypr_optimized(Network::Channel* pChannel, MemoryStream& s)
+{
+	ClientObject* pClient = findClient(pChannel);
+	if (pClient)
+	{
+		pClient->onUpdateData_ypr_optimized(pChannel, s);
+	}
+}
+
+//-------------------------------------------------------------------------------------
+void Bots::onUpdateData_yp_optimized(Network::Channel* pChannel, MemoryStream& s)
+{
+	ClientObject* pClient = findClient(pChannel);
+	if (pClient)
+	{
+		pClient->onUpdateData_yp_optimized(pChannel, s);
+	}
+}
+
+//-------------------------------------------------------------------------------------
+void Bots::onUpdateData_yr_optimized(Network::Channel* pChannel, MemoryStream& s)
+{
+	ClientObject* pClient = findClient(pChannel);
+	if (pClient)
+	{
+		pClient->onUpdateData_yr_optimized(pChannel, s);
+	}
+}
+
+//-------------------------------------------------------------------------------------
+void Bots::onUpdateData_pr_optimized(Network::Channel* pChannel, MemoryStream& s)
+{
+	ClientObject* pClient = findClient(pChannel);
+	if (pClient)
+	{
+		pClient->onUpdateData_pr_optimized(pChannel, s);
+	}
+}
+
+//-------------------------------------------------------------------------------------
+void Bots::onUpdateData_y_optimized(Network::Channel* pChannel, MemoryStream& s)
+{
+	ClientObject* pClient = findClient(pChannel);
+	if (pClient)
+	{
+		pClient->onUpdateData_y_optimized(pChannel, s);
+	}
+}
+
+//-------------------------------------------------------------------------------------
+void Bots::onUpdateData_p_optimized(Network::Channel* pChannel, MemoryStream& s)
+{
+	ClientObject* pClient = findClient(pChannel);
+	if (pClient)
+	{
+		pClient->onUpdateData_p_optimized(pChannel, s);
+	}
+}
+
+//-------------------------------------------------------------------------------------
+void Bots::onUpdateData_r_optimized(Network::Channel* pChannel, MemoryStream& s)
+{
+	ClientObject* pClient = findClient(pChannel);
+	if (pClient)
+	{
+		pClient->onUpdateData_r_optimized(pChannel, s);
+	}
+}
+
+//-------------------------------------------------------------------------------------
+void Bots::onUpdateData_xz_optimized(Network::Channel* pChannel, MemoryStream& s)
+{
+	ClientObject* pClient = findClient(pChannel);
+	if (pClient)
+	{
+		pClient->onUpdateData_xz_optimized(pChannel, s);
+	}
+}
+
+//-------------------------------------------------------------------------------------
+void Bots::onUpdateData_xz_ypr_optimized(Network::Channel* pChannel, MemoryStream& s)
+{
+	ClientObject* pClient = findClient(pChannel);
+	if (pClient)
+	{
+		pClient->onUpdateData_xz_ypr_optimized(pChannel, s);
+	}
+}
+
+//-------------------------------------------------------------------------------------
+void Bots::onUpdateData_xz_yp_optimized(Network::Channel* pChannel, MemoryStream& s)
+{
+	ClientObject* pClient = findClient(pChannel);
+	if (pClient)
+	{
+		pClient->onUpdateData_xz_yp_optimized(pChannel, s);
+	}
+}
+
+//-------------------------------------------------------------------------------------
+void Bots::onUpdateData_xz_yr_optimized(Network::Channel* pChannel, MemoryStream& s)
+{
+	ClientObject* pClient = findClient(pChannel);
+	if (pClient)
+	{
+		pClient->onUpdateData_xz_yr_optimized(pChannel, s);
+	}
+}
+
+//-------------------------------------------------------------------------------------
+void Bots::onUpdateData_xz_pr_optimized(Network::Channel* pChannel, MemoryStream& s)
+{
+	ClientObject* pClient = findClient(pChannel);
+	if (pClient)
+	{
+		pClient->onUpdateData_xz_pr_optimized(pChannel, s);
+	}
+}
+
+//-------------------------------------------------------------------------------------
+void Bots::onUpdateData_xz_y_optimized(Network::Channel* pChannel, MemoryStream& s)
+{
+	ClientObject* pClient = findClient(pChannel);
+	if (pClient)
+	{
+		pClient->onUpdateData_xz_y_optimized(pChannel, s);
+	}
+}
+
+//-------------------------------------------------------------------------------------
+void Bots::onUpdateData_xz_p_optimized(Network::Channel* pChannel, MemoryStream& s)
+{
+	ClientObject* pClient = findClient(pChannel);
+	if (pClient)
+	{
+		pClient->onUpdateData_xz_p_optimized(pChannel, s);
+	}
+}
+
+//-------------------------------------------------------------------------------------
+void Bots::onUpdateData_xz_r_optimized(Network::Channel* pChannel, MemoryStream& s)
+{
+	ClientObject* pClient = findClient(pChannel);
+	if (pClient)
+	{
+		pClient->onUpdateData_xz_r_optimized(pChannel, s);
+	}
+}
+
+//-------------------------------------------------------------------------------------
+void Bots::onUpdateData_xyz_optimized(Network::Channel* pChannel, MemoryStream& s)
+{
+	ClientObject* pClient = findClient(pChannel);
+	if (pClient)
+	{
+		pClient->onUpdateData_xyz_optimized(pChannel, s);
+	}
+}
+
+//-------------------------------------------------------------------------------------
+void Bots::onUpdateData_xyz_ypr_optimized(Network::Channel* pChannel, MemoryStream& s)
+{
+	ClientObject* pClient = findClient(pChannel);
+	if (pClient)
+	{
+		pClient->onUpdateData_xyz_ypr_optimized(pChannel, s);
+	}
+}
+
+//-------------------------------------------------------------------------------------
+void Bots::onUpdateData_xyz_yp_optimized(Network::Channel* pChannel, MemoryStream& s)
+{
+	ClientObject* pClient = findClient(pChannel);
+	if (pClient)
+	{
+		pClient->onUpdateData_xyz_yp_optimized(pChannel, s);
+	}
+}
+
+//-------------------------------------------------------------------------------------
+void Bots::onUpdateData_xyz_yr_optimized(Network::Channel* pChannel, MemoryStream& s)
+{
+	ClientObject* pClient = findClient(pChannel);
+	if (pClient)
+	{
+		pClient->onUpdateData_xyz_yr_optimized(pChannel, s);
+	}
+}
+
+//-------------------------------------------------------------------------------------
+void Bots::onUpdateData_xyz_pr_optimized(Network::Channel* pChannel, MemoryStream& s)
+{
+	ClientObject* pClient = findClient(pChannel);
+	if (pClient)
+	{
+		pClient->onUpdateData_xyz_pr_optimized(pChannel, s);
+	}
+}
+
+//-------------------------------------------------------------------------------------
+void Bots::onUpdateData_xyz_y_optimized(Network::Channel* pChannel, MemoryStream& s)
+{
+	ClientObject* pClient = findClient(pChannel);
+	if (pClient)
+	{
+		pClient->onUpdateData_xyz_y_optimized(pChannel, s);
+	}
+}
+
+//-------------------------------------------------------------------------------------
+void Bots::onUpdateData_xyz_p_optimized(Network::Channel* pChannel, MemoryStream& s)
+{
+	ClientObject* pClient = findClient(pChannel);
+	if (pClient)
+	{
+		pClient->onUpdateData_xyz_p_optimized(pChannel, s);
+	}
+}
+
+//-------------------------------------------------------------------------------------
+void Bots::onUpdateData_xyz_r_optimized(Network::Channel* pChannel, MemoryStream& s)
+{
+	ClientObject* pClient = findClient(pChannel);
+	if (pClient)
+	{
+		pClient->onUpdateData_xyz_r_optimized(pChannel, s);
 	}
 }
 

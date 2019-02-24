@@ -5,6 +5,7 @@
 #define KBE_ENTITY_COMPONENT_H
 	
 #include "common/common.h"
+#include "common/timer.h"
 #include "pyscript/scriptobject.h"
 #include "entitydef/common.h"
 #include "entitydef/scriptdef_module.h"
@@ -28,10 +29,10 @@ namespace KBEngine {
 #define CALL_COMPONENTS_AND_ENTITY_METHOD(ENTITYOBJ, CALLCODE)													\
 {																												\
 	{																											\
-		CALL_ENTITY_COMPONENTS_METHOD(ENTITYOBJ, CALLCODE);														\
-		bool GETERR = false;																					\
 		Py_INCREF(ENTITYOBJ);																					\
 		PyObject* pyTempObj = ENTITYOBJ;																		\
+		CALL_ENTITY_COMPONENTS_METHOD(ENTITYOBJ, CALLCODE);														\
+		bool GETERR = false;																					\
 		CALLCODE;																								\
 		Py_DECREF(ENTITYOBJ);																					\
 	}																											\
@@ -81,7 +82,6 @@ class EntityComponent : public script::ScriptObject
 	BASE_SCRIPT_HREADER(EntityComponent, ScriptObject)
 public:
 	EntityComponent(ENTITY_ID ownerID, ScriptDefModule* pComponentDescrs, COMPONENT_TYPE assignmentToComponentType/*属性所属实体的哪一部分，cell或者base?*/);
-	
 	~EntityComponent();
 
 	/** 
@@ -95,6 +95,10 @@ public:
 	void updateOwner(ENTITY_ID id, PyObject* pOwner);
 
 	DECLARE_PY_GET_MOTHOD(pyIsDestroyed);
+
+	void destroyed() {
+		ownerID_ = 0;
+	}
 
 	bool isDestroyed() const {
 		return ownerID() == 0;

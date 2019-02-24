@@ -35,25 +35,20 @@ EntityComponent::ENTITY_COMPONENTS EntityComponent::entity_components;
 #define DEBUG_OP_ATTRIBUTE(op, ccattr)																		\
 		if(g_debugEntity)																					\
 		{																									\
-			wchar_t* PyUnicode_AsWideCharStringRet2 = PyUnicode_AsWideCharString(ccattr, NULL);				\
-			char* ccattr_DEBUG_OP_ATTRIBUTE = strutil::wchar2char(PyUnicode_AsWideCharStringRet2);			\
+			const char* ccattr_DEBUG_OP_ATTRIBUTE = PyUnicode_AsUTF8AndSize(ccattr, NULL);					\
 			DEBUG_MSG(fmt::format("{}.{}(refc={}, id={})::debug_op_attr:op={}, {}.\n",						\
 												owner()->ob_type->tp_name,									\
 										(pComponentDescrs_ ? pComponentDescrs_->getName() : ""),			\
 												static_cast<PyObject*>(this)->ob_refcnt, this->ownerID(),	\
 															op, ccattr_DEBUG_OP_ATTRIBUTE));				\
-			free(ccattr_DEBUG_OP_ATTRIBUTE);																\
-			PyMem_Free(PyUnicode_AsWideCharStringRet2);														\
 		}																									\
 
 #define DEBUG_CREATE_NAMESPACE																				\
 		if(g_debugEntity)																					\
 		{																									\
-			wchar_t* PyUnicode_AsWideCharStringRet1 = PyUnicode_AsWideCharString(key, NULL);				\
-			char* ccattr_DEBUG_CREATE_NAMESPACE= strutil::wchar2char(PyUnicode_AsWideCharStringRet1);		\
+			const char* ccattr_DEBUG_CREATE_NAMESPACE = PyUnicode_AsUTF8AndSize(key, NULL);					\
 			PyObject* pytsval = PyObject_Str(value);														\
-			wchar_t* cwpytsval = PyUnicode_AsWideCharString(pytsval, NULL);									\
-			char* cccpytsval = strutil::wchar2char(cwpytsval);												\
+			const char* cccpytsval = PyUnicode_AsUTF8AndSize(pytsval, NULL);								\
 			Py_DECREF(pytsval);																				\
 			DEBUG_MSG(fmt::format("{}.{}(refc={}, id={})::debug_createNamespace:add {}({}).\n",				\
 												owner()->ob_type->tp_name,									\
@@ -62,10 +57,6 @@ EntityComponent::ENTITY_COMPONENTS EntityComponent::entity_components;
 												this->ownerID(),											\
 																ccattr_DEBUG_CREATE_NAMESPACE,				\
 																cccpytsval));								\
-			free(ccattr_DEBUG_CREATE_NAMESPACE);															\
-			PyMem_Free(PyUnicode_AsWideCharStringRet1);														\
-			free(cccpytsval);																				\
-			PyMem_Free(cwpytsval);																			\
 		}																									\
 
 
@@ -106,8 +97,11 @@ EntityComponent::~EntityComponent()
 
 	script::PyGC::decTracing("EntityComponent");
 
-	if(owner_)
+	// 组件以及被销毁的情况不能再减引用，查看onOwnerDestroyEnd中描述
+	if(!isDestroyed() && owner_)
 		Py_DECREF(owner_);
+
+	//ERROR_MSG(fmt::format("{}::~{}!\n", pComponentDescrs_->getName(), pComponentDescrs_->getName()));
 }
 
 //-------------------------------------------------------------------------------------
@@ -368,13 +362,13 @@ PyObject* EntityComponent::__unpickle__(PyObject* self, PyObject* args)
 	Py_ssize_t size = PyTuple_Size(args);
 	if (size != 2)
 	{
-		ERROR_MSG("EntityComponent::__unpickle__: args is error! size != 2.\n");
+		ERROR_MSG("EntityComponent::__unpickle__: args error! size != 2.\n");
 		S_Return;
 	}
 
 	if (!PyArg_ParseTuple(args, "iHH", &ownerID, &utype, &ctype))
 	{
-		ERROR_MSG("EntityComponent::__unpickle__: args is error!\n");
+		ERROR_MSG("EntityComponent::__unpickle__: args error!\n");
 		S_Return;
 	}
 
@@ -409,9 +403,7 @@ void EntityComponent::onInstallScript(PyObject* mod)
 int EntityComponent::onScriptSetAttribute(PyObject* attr, PyObject* value)
 {
 	DEBUG_OP_ATTRIBUTE("set", attr)
-	wchar_t* PyUnicode_AsWideCharStringRet0 = PyUnicode_AsWideCharString(attr, NULL);
-	char* ccattr = strutil::wchar2char(PyUnicode_AsWideCharStringRet0);
-	PyMem_Free(PyUnicode_AsWideCharStringRet0);	
+	const char* ccattr = PyUnicode_AsUTF8AndSize(attr, NULL);
 
 	const ScriptDefModule::PROPERTYDESCRIPTION_MAP* pPropertyDescrs = &pComponentDescrs_->getPropertyDescrs();
 
@@ -428,7 +420,6 @@ int EntityComponent::onScriptSetAttribute(PyObject* attr, PyObject* value)
 				PyErr_Format(PyExc_AssertionError, "can't set %s.%s to %s. entity is destroyed!",
 					scriptName(), ccattr, value->ob_type->tp_name);
 				PyErr_PrintEx(0);
-				free(ccattr);
 				return 0;
 			}
 
@@ -437,7 +428,6 @@ int EntityComponent::onScriptSetAttribute(PyObject* attr, PyObject* value)
 				PyErr_Format(PyExc_ValueError, "can't set %s.%s to %s.",
 					scriptName(), ccattr, value->ob_type->tp_name);
 				PyErr_PrintEx(0);
-				free(ccattr);
 				return 0;
 			}
 			else
@@ -495,27 +485,23 @@ int EntityComponent::onScriptSetAttribute(PyObject* attr, PyObject* value)
 						Py_DECREF(pySetObj);
 				}
 
-				free(ccattr);
 				return pySetObj == NULL ? -1 : 0;
 			}
 		}
 	}
 
-	free(ccattr);
 	return ScriptObject::onScriptSetAttribute(attr, value);
 }
 
 //-------------------------------------------------------------------------------------
 int EntityComponent::onScriptDelAttribute(PyObject* attr)
 {
-	wchar_t* PyUnicode_AsWideCharStringRet0 = PyUnicode_AsWideCharString(attr, NULL);
-	char* ccattr = strutil::wchar2char(PyUnicode_AsWideCharStringRet0);
-	PyMem_Free(PyUnicode_AsWideCharStringRet0);
+	const char* ccattr = PyUnicode_AsUTF8AndSize(attr, NULL);
 	DEBUG_OP_ATTRIBUTE("del", attr)
 
 	const ScriptDefModule::PROPERTYDESCRIPTION_MAP* pPropertyDescrs = &pComponentDescrs_->getPropertyDescrs();
 
-	if (pPropertyDescrs)
+	if (pPropertyDescrs) 
 	{
 		ScriptDefModule::PROPERTYDESCRIPTION_MAP::const_iterator iter = pPropertyDescrs->find(ccattr);
 		if (iter != pPropertyDescrs->end())
@@ -524,7 +510,6 @@ int EntityComponent::onScriptDelAttribute(PyObject* attr)
 			kbe_snprintf(err, 255, "property[%s] defined in %s.def, del failed!", ccattr, scriptName());
 			PyErr_SetString(PyExc_TypeError, err);
 			PyErr_PrintEx(0);
-			free(ccattr);
 			return 0;
 		}
 	}
@@ -535,11 +520,9 @@ int EntityComponent::onScriptDelAttribute(PyObject* attr)
 		kbe_snprintf(err, 255, "method[%s] defined in %s.def, del failed!", ccattr, scriptName());
 		PyErr_SetString(PyExc_TypeError, err);
 		PyErr_PrintEx(0);
-		free(ccattr);
 		return 0;
 	}
 
-	free(ccattr);
 	return ScriptObject::onScriptDelAttribute(attr);
 }
 
@@ -596,12 +579,15 @@ void EntityComponent::onOwnerDestroyBegin(PyObject* pEntity, ScriptDefModule* pE
 //-------------------------------------------------------------------------------------
 void EntityComponent::onOwnerDestroyEnd(PyObject* pEntity, ScriptDefModule* pEntityScriptDescrs, bool callScript)
 {
-	ownerID_ = 0;
+	destroyed();
 
 	if (owner_)
 		Py_DECREF(owner_);
 
-	owner_ = NULL;
+	// 此处减引用是为了解除组件和实体之间的循环引用导致无法释放问题
+	// 但是此处不设置为NULL， 由于在多个组件的情况时如在某个组件脚本的onClientDeath中调用owner.destroy()
+	// 其他脚本中也需要能够访问到owner，只不过owner的isDestroyed为True
+	//owner_ = NULL;
 }
 
 //-------------------------------------------------------------------------------------
@@ -617,7 +603,7 @@ void EntityComponent::c_str(char* s, size_t size)
 {
 	kbe_snprintf(s, size, "EntityComponent=%s, utype=%d, owner=%s, ownerID=%d, domain=%s.",
 		pComponentDescrs_ ? pComponentDescrs_->getName() : "", pComponentDescrs_ ? pComponentDescrs_->getUType() : 0,
-		owner()->ob_type->tp_name, ownerID(), COMPONENT_NAME_EX(componentType()));
+		(owner() ? owner()->ob_type->tp_name : "unknown"), ownerID(), COMPONENT_NAME_EX(componentType()));
 }
 
 //-------------------------------------------------------------------------------------
@@ -979,13 +965,14 @@ void EntityComponent::addToServerStream(MemoryStream* mstream, PyObject* pyValue
 	const ScriptDefModule::PROPERTYDESCRIPTION_MAP* pPropertyDescrs = pChildPropertyDescrs();
 
 	uint16 count = (uint16)pPropertyDescrs->size();
+	uint16 oldCount = count;
+	size_t oldWpos = mstream->wpos();
 	(*mstream) << count;
 
 	ScriptDefModule::PROPERTYDESCRIPTION_MAP::const_iterator iter = pPropertyDescrs->begin();
 	for (; iter != pPropertyDescrs->end(); ++iter)
 	{
 		PropertyDescription* propertyDescription = iter->second;
-
 		PyObject* pyVal = PyObject_GetAttrString(this, propertyDescription->getName());
 		if (pyVal)
 		{
@@ -995,6 +982,8 @@ void EntityComponent::addToServerStream(MemoryStream* mstream, PyObject* pyValue
 					propertyDescription->getName(), (pyVal ? pyVal->ob_type->tp_name : "unknown"), propertyDescription->getDataType()->getName(),
 					pComponentDescrs_ ? pComponentDescrs_->getName() : "", pComponentDescrs_ ? pComponentDescrs_->getUType() : 0,
 					owner()->ob_type->tp_name, ownerID(), COMPONENT_NAME_EX(componentType())));
+
+				--count;
 			}
 			else
 			{
@@ -1021,6 +1010,14 @@ void EntityComponent::addToServerStream(MemoryStream* mstream, PyObject* pyValue
 			propertyDescription->addToStream(mstream, pyDefVal);
 			Py_DECREF(pyDefVal);
 		}
+	}
+
+	if (oldCount != count)
+	{
+		size_t wpos = mstream->wpos();
+		mstream->wpos(oldWpos);
+		(*mstream) << count;
+		mstream->wpos(wpos);
 	}
 }
 
@@ -1347,9 +1344,7 @@ void EntityComponent::updateFromDict(PyObject* pOwner, PyObject* pyDict)
 
 	while (PyDict_Next(pyDict, &pos, &key, &value))
 	{
-		wchar_t* PyUnicode_AsWideCharStringRet0 = PyUnicode_AsWideCharString(key, NULL);
-		char* ccattr = strutil::wchar2char(PyUnicode_AsWideCharStringRet0);
-		PyMem_Free(PyUnicode_AsWideCharStringRet0);
+		const char* ccattr = PyUnicode_AsUTF8AndSize(key, NULL);
 
 		ScriptDefModule::PROPERTYDESCRIPTION_MAP::const_iterator iter = pPropertyDescrs->find(ccattr);
 		if (iter != pPropertyDescrs->end())
@@ -1387,8 +1382,6 @@ void EntityComponent::updateFromDict(PyObject* pOwner, PyObject* pyDict)
 			PyObject_SetAttr(static_cast<PyObject*>(this),
 				key, value);
 		}
-
-		free(ccattr);
 	}
 
 	SCRIPT_ERROR_CHECK();
@@ -1502,12 +1495,18 @@ PyObject* EntityComponent::pyGetCellEntityCall()
 	}
 
 	PyObject* entityCall = PyObject_GetAttrString(pEntity, "cell");
-	if (!entityCall || entityCall == Py_None)
+	if (!entityCall)
 	{
-		PyErr_Format(PyExc_AttributeError, "'%s: %d' object has no attribute 'cell'\n",
+		PyErr_Format(PyExc_AttributeError, "'%s: %d' object has no attribute 'EntityComponent.cell'\n",
 			pEntity->ob_type->tp_name, ownerID_);
 
 		return NULL;
+	}
+
+	if (entityCall == Py_None)
+	{
+		// 无需减引用
+		return entityCall;
 	}
 
 	PyObject* pyObj = PyObject_GetAttrString(entityCall, pPropertyDescription_->getName());
@@ -1529,12 +1528,18 @@ PyObject* EntityComponent::pyGetBaseEntityCall()
 	}
 
 	PyObject* entityCall = PyObject_GetAttrString(pEntity, "base");
-	if (!entityCall || entityCall == Py_None)
+	if (!entityCall)
 	{
-		PyErr_Format(PyExc_AttributeError, "'%s: %d' object has no attribute 'base'\n",
+		PyErr_Format(PyExc_AttributeError, "'%s: %d' object has no attribute 'EntityComponent.base'\n",
 			pEntity->ob_type->tp_name, ownerID_);
 
 		return NULL;
+	}
+
+	if (entityCall == Py_None)
+	{
+		// 无需减引用
+		return entityCall;
 	}
 
 	PyObject* pyObj = PyObject_GetAttrString(entityCall, pPropertyDescription_->getName());
@@ -1556,12 +1561,18 @@ PyObject* EntityComponent::pyGetClientEntityCall()
 	}
 
 	PyObject* entityCall = PyObject_GetAttrString(pEntity, "client");
-	if (!entityCall || entityCall == Py_None)
+	if (!entityCall)
 	{
-		PyErr_Format(PyExc_AttributeError, "'%s: %d' object has no attribute 'client'\n",
+		PyErr_Format(PyExc_AttributeError, "'%s: %d' object has no attribute 'EntityComponent.client'\n",
 			pEntity->ob_type->tp_name, ownerID_);
 
 		return NULL;
+	}
+
+	if (entityCall == Py_None)
+	{
+		// 无需减引用
+		return entityCall;
 	}
 
 	PyObject* pyObj = PyObject_GetAttrString(entityCall, pPropertyDescription_->getName());
@@ -1583,12 +1594,18 @@ PyObject* EntityComponent::pyGetAllClients()
 	}
 
 	PyObject* entityCall = PyObject_GetAttrString(pEntity, "allClients");
-	if (!entityCall || entityCall == Py_None)
+	if (!entityCall)
 	{
-		PyErr_Format(PyExc_AttributeError, "'%s: %d' object has no attribute 'allClients'\n",
+		PyErr_Format(PyExc_AttributeError, "'%s: %d' object has no attribute 'EntityComponent.allClients'\n",
 			pEntity->ob_type->tp_name, ownerID_);
 
 		return NULL;
+	}
+
+	if (entityCall == Py_None)
+	{
+		// 无需减引用
+		return entityCall;
 	}
 
 	PyObject* pyObj = PyObject_GetAttrString(entityCall, pPropertyDescription_->getName());
@@ -1610,12 +1627,18 @@ PyObject* EntityComponent::pyGetOtherClients()
 	}
 
 	PyObject* entityCall = PyObject_GetAttrString(pEntity, "otherClients");
-	if (!entityCall || entityCall == Py_None)
+	if (!entityCall)
 	{
-		PyErr_Format(PyExc_AttributeError, "'%s: %d' object has no attribute 'otherClients'\n",
+		PyErr_Format(PyExc_AttributeError, "'%s: %d' object has no attribute 'EntityComponent.otherClients'\n",
 			pEntity->ob_type->tp_name, ownerID_);
 
 		return NULL;
+	}
+
+	if (entityCall == Py_None)
+	{
+		// 无需减引用
+		return entityCall;
 	}
 
 	PyObject* pyObj = PyObject_GetAttrString(entityCall, pPropertyDescription_->getName());

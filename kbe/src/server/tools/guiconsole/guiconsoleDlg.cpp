@@ -98,7 +98,7 @@ public:
 	{
 		CguiconsoleDlg* dlg = static_cast<CguiconsoleDlg*>(theApp.m_pMainWnd);
 		std::string str;
-		s >> str;
+		s.readBlob(str);
 		dlg->onReceiveRemoteLog(str);
 	};
 };
@@ -255,7 +255,7 @@ RESTART_RECV:
 				}
 				else
 				{
-					ERROR_MSG(fmt::format("CguiconsoleDlg::OnTimer: {} not found. receive data is error!\n",
+					ERROR_MSG(fmt::format("CguiconsoleDlg::OnTimer: {} not found. receive data error!\n",
 						COMPONENT_NAME_EX((COMPONENT_TYPE)findComponentType)));
 				}
 
@@ -1373,7 +1373,7 @@ bool CguiconsoleDlg::connectTo()
 	if(endpoint->connect(addr.port, addr.ip) == -1)
 	{
 		CString err;
-		err.Format(L"connect server is error! %d", ::WSAGetLastError());
+		err.Format(L"connect server error! %d", ::WSAGetLastError());
 		AfxMessageBox(err);
 		return false;
 	}

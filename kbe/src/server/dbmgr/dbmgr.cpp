@@ -19,6 +19,7 @@
 #include "db_interface/db_interface.h"
 #include "db_mysql/db_interface_mysql.h"
 #include "entitydef/scriptdef_module.h"
+#include "entitydef/py_entitydef.h"
 
 #include "baseapp/baseapp_interface.h"
 #include "cellapp/cellapp_interface.h"
@@ -211,8 +212,9 @@ void Dbmgr::handleMainTick()
 {
 	AUTO_SCOPED_PROFILE("mainTick");
 	
-	 //time_t t = ::time(NULL);
-	 //DEBUG_MSG("Dbmgr::handleGameTick[%"PRTime"]:%u\n", t, time_);
+	 // time_t t = ::time(NULL);
+	 // static int kbeTime = 0;
+	 // DEBUG_MSG(fmt::format("Dbmgr::handleGameTick[{}]:{}\n", t, ++kbeTime));
 	
 	threadPool_.onMainThreadTick();
 	DBUtil::handleMainTick();
@@ -323,6 +325,18 @@ bool Dbmgr::initializeEnd()
 	Components::getSingleton().extraData4(pTelnetServer_->port());
 	
 	return ret && initInterfacesHandler() && initDB();
+}
+
+//-------------------------------------------------------------------------------------
+bool Dbmgr::installPyModules()
+{
+	return PythonApp::installPyModules() && script::entitydef::installModule("EntityDef");
+}
+
+//-------------------------------------------------------------------------------------
+bool Dbmgr::uninstallPyModules()
+{
+	return script::entitydef::uninstallModule() && PythonApp::uninstallPyModules();
 }
 
 //-------------------------------------------------------------------------------------		

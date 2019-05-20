@@ -177,6 +177,7 @@ typedef struct EngineComponentInfo
 	bool allowEmptyDigest;									// 是否检查defs-MD5
 	bool account_registration_enable;						// 是否开放注册
 	bool account_reset_password_enable;						// 是否开放重设密码功能
+	bool isShareDB;											// 是否共享数据库
 
 	float archivePeriod;									// entity存储数据库周期
 	float backupPeriod;										// entity备份周期
@@ -185,6 +186,8 @@ typedef struct EngineComponentInfo
 
 	float loadSmoothingBias;								// baseapp负载滤平衡调整值， 
 	uint32 login_port;										// 服务器登录端口 目前bots在用
+	uint32 login_port_min;									// 服务器登录端口使用指定范围 目前bots在用
+	uint32 login_port_max;
 	char login_ip[MAX_BUF];									// 服务器登录ip地址
 
 	ENTITY_ID ids_criticallyLowSize;						// id剩余这么多个时向dbmgr申请新的id资源
